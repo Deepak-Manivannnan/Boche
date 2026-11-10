@@ -2,6 +2,7 @@
 
 There is deliberately no endpoint that redraws, edits or rejects Winners."""
 
+from datetime import timedelta
 from typing import Annotated
 
 import sqlalchemy as sa
@@ -13,8 +14,9 @@ from app import models as m
 from app.deps import get_db, require_admin
 from app.drand import round_released_at
 from app.drawrun import DrawRefused, run_draw
-from app.lifecycle import publish_results
+from app.lifecycle import publish_results, publish_seals
 from app.otp import OtpRefused, active_expiry, request_otp
+from app.testmode import TestModeRefused, close_test_day, create_test_day, seed_tickets
 
 router = APIRouter(prefix="/api/admin")
 Db = Annotated[Session, Depends(get_db)]
@@ -98,7 +100,10 @@ def send_founder_otp(label: Label, request: Request, db: Db) -> dict:
         challenge = request_otp(db, day, admin, now, state.otp_sender, state.settings.founder_mobile)
     except OtpRefused as e:
         raise HTTPException(status_code=e.status, detail=e.detail) from e
-    return {"sent": True, "expiresAt": _iso(challenge.expires_at)}
+    sent = {"sent": True, "expiresAt": _iso(challenge.expires_at)}
+    if day.kind == "test":  # Test days only: show the code so a demo works without the Founder's phone
+        sent["testCode"] = challenge.plain_code
+    return sent
 
 
 @router.post("/draw-days/{label}/run")
@@ -112,3 +117,49 @@ def enter_otp_and_run(label: Label, body: OtpEntry, request: Request, db: Db) ->
     except DrawRefused as e:
         raise HTTPException(status_code=e.status, detail=e.detail) from e
     return day_json(db, day, state.clock.now())
+
+
+# ---------------------------------------------------------------- test mode
+
+
+class Seed(BaseModel):
+    count: int = Field(ge=1)
+
+
+class Close(BaseModel):
+    publishGapMinutes: int = Field(default=0, ge=0, le=120)  # noqa: N815 (JSON field name)
+
+
+def _refused(e: TestModeRefused) -> HTTPException:
+    return HTTPException(status_code=e.status, detail=e.detail)
+
+
+@router.post("/test-days", status_code=201)
+def new_test_day(request: Request, db: Db) -> dict:
+    require_admin(request, db)
+    now = request.app.state.clock.now()
+    return day_json(db, create_test_day(db, now), now)
+
+
+@router.post("/test-days/{label}/seed")
+def seed_test_day(label: Label, body: Seed, request: Request, db: Db) -> dict:
+    require_admin(request, db)
+    state = request.app.state
+    try:
+        total = seed_tickets(db, label, body.count, state.clock.now(), state.settings.payment_secret)
+    except TestModeRefused as e:
+        raise _refused(e) from e
+    return {"label": label, "ticketCount": total}
+
+
+@router.post("/test-days/{label}/close")
+def close_now(label: Label, body: Close, request: Request, db: Db) -> dict:
+    require_admin(request, db)
+    state, now = request.app.state, request.app.state.clock.now()
+    try:
+        day = close_test_day(db, label, now, timedelta(minutes=body.publishGapMinutes))
+    except TestModeRefused as e:
+        raise _refused(e) from e
+    publish_seals(db, state.seal_publisher)
+    db.refresh(day)
+    return day_json(db, day, now)

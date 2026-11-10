@@ -94,6 +94,7 @@ def request_otp(db: Session, day: m.DrawDay, admin: m.User, now: datetime, sende
     db.add(challenge)
     db.commit()
     sender.send(to, message(day, code))
+    challenge.plain_code = code  # in memory only, never stored
     return challenge
 
 

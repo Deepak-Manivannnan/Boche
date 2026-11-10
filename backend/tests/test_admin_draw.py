@@ -68,6 +68,10 @@ def test_the_admin_api_offers_no_way_to_redraw_edit_or_reject_winners(w):
         ("/api/admin/draw-days/{label}/otp", ("POST",)),
         ("/api/admin/draw-days/{label}/run", ("POST",)),
         ("/api/admin/orders/{order_id}/refund", ("POST",)),
+        # test mode: only ever acts on kind="test" days
+        ("/api/admin/test-days", ("POST",)),
+        ("/api/admin/test-days/{label}/seed", ("POST",)),
+        ("/api/admin/test-days/{label}/close", ("POST",)),
     }
 
 

@@ -22,7 +22,7 @@ class FakeOtp:
 
     @property
     def code(self):
-        return re.search(r"\b(\d{6})\b", self.sent[-1][1]).group(1)
+        return re.search(r"OTP (\d{6})\b", self.sent[-1][1]).group(1)
 
 
 def drand_value(round_no):
