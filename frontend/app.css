@@ -1522,3 +1522,5 @@ a.hm-cta, .hm-cta { min-height: 30px; }
 /* Sign in with Google: Google draws its own button inside this slot (its branding rules); the slot keeps the welcome sheet's spacing */
 .gsi-slot { display: flex; justify-content: center; align-items: center; min-height: 44px; margin: 4px 0 2px; }
 .gsi-slot > div { width: 100%; display: flex; justify-content: center; }
+/* Lucky Draw admin: fingerprints are long hex strings */
+.adm-fp { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; word-break: break-all; }

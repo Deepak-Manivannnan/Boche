@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app import models as m
-from app.deps import current_user, get_db
+from app.deps import current_user, get_db, require_admin
 from app.drawdays import accepts_entries, entry_day, real_day
 
 router = APIRouter(prefix="/api")
@@ -59,9 +59,7 @@ def refund_order(order_id: str, request: Request, db: Db) -> dict:
     """Refund rules: before Entries close, the Order's Tickets leave the draw. Once a list is closed,
     nothing may leave it, so the refund waits until that Draw day is published. An Order holding a
     Winner can never be refunded."""
-    admin = current_user(request, db)
-    if admin.role != "admin":
-        raise HTTPException(status_code=403, detail="Admins only")
+    require_admin(request, db)
     now = request.app.state.clock.now()
     order = db.scalar(sa.select(m.Order).where(m.Order.public_id == order_id).with_for_update())
     if order is None:

@@ -21,6 +21,14 @@ def current_user(request: Request, db: Session) -> m.User:
     return user
 
 
+def require_admin(request: Request, db: Session) -> m.User:
+    """An Admin is a signed-in user whose email is on the server's Admin list right now."""
+    user = current_user(request, db)
+    if user.role != "admin" or user.email not in request.app.state.settings.admin_emails:
+        raise HTTPException(status_code=403, detail="Admins only")
+    return user
+
+
 def user_json(user: m.User) -> dict:
     return {
         "id": user.id,

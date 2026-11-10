@@ -285,14 +285,16 @@
   }
   /* Sign in with Google (Google Identity Services). The button is Google's own, as its branding rules
      require; the server checks the ID token and sets an httpOnly session cookie. */
-  AFTER.welcome = AFTER.login = function () {
+  AFTER.welcome = AFTER.login = function () { mountGoogleButton('gsiBtn', 'mobErr', onGoogleCredential); };
+  /* Renders Google's button into a slot once the GIS library and the client ID are ready */
+  function mountGoogleButton(slotId, errId, onCredential) {
     var tries = 0;
     function ready() {
-      var slot = $('gsiBtn');
+      var slot = $(slotId);
       if (!slot) return true;
       var gid = window.google && window.google.accounts && window.google.accounts.id;
       if (!gid || !BOOT.googleClientId) return false;
-      gid.initialize({ client_id: BOOT.googleClientId, callback: onGoogleCredential, ux_mode: 'popup', auto_select: false, cancel_on_tap_outside: true });
+      gid.initialize({ client_id: BOOT.googleClientId, callback: onCredential, ux_mode: 'popup', auto_select: false, cancel_on_tap_outside: true });
       slot.innerHTML = '';
       gid.renderButton(slot, { type: 'standard', theme: 'outline', size: 'large', shape: 'pill', text: 'continue_with', logo_alignment: 'center', width: Math.min(400, slot.clientWidth || 320) });
       return true;
@@ -300,10 +302,10 @@
     if (ready()) return;
     var t = setInterval(function () {
       if (ready()) { clearInterval(t); return; }
-      if (++tries > 80) { clearInterval(t); var e = $('mobErr'); if (e) e.textContent = BOOT.googleClientId ? 'Google sign-in could not load. Check your connection and reload.' : 'Sign-in is not available right now. Please try again later.'; }
+      if (++tries > 80) { clearInterval(t); var e = $(errId); if (e) e.textContent = BOOT.googleClientId ? 'Google sign-in could not load. Check your connection and reload.' : 'Sign-in is not available right now. Please try again later.'; }
     }, 100);
     timers.push(t);
-  };
+  }
   function onGoogleCredential(resp) {
     var slot = $('gsiBtn'); if (slot) slot.innerHTML = '<span class="mini-spin" aria-label="Signing in"></span>';
     ui.signInErr = '';
@@ -1698,13 +1700,86 @@
     var hint = BC_STAFF.map(function (s) { return '<div>' + esc(s.name) + ' · ' + esc(biz(s.biz).name) + ' — <b>' + esc(s.mobile) + '</b></div>'; }).join('');
     return topbar('', 'welcome') + '<div class="auth"><span class="badge">' + ic('scan', 13) + ' Boche business app</span>' +
       '<h1 class="mt12">Business sign-in</h1><p class="lead">For staff at Boche venues. Verify members, check them in and post bills.</p>' +
-      '<div class="field-l">Staff mobile number</div>' +
+      '<div class="field-l">Lucky Draw admin</div>' +
+      (ME && ME.role === 'admin'
+        ? '<button class="btn btn-gold" data-go="admin-draw">' + ic('crown', 16) + 'Open Tonight’s draw</button>'
+        : '<div class="gsi-slot" id="gsiAdmin"><span class="mini-spin" aria-label="Loading Google sign-in"></span></div>' +
+          '<div class="err-text" id="adminErr">' + esc(ui.adminErr || '') + '</div>') +
+      '<div class="field-l">Venue staff mobile number</div>' +
       '<div class="phone-field"><span class="cc">+91</span><input id="smobile" type="tel" inputmode="numeric" maxlength="10" placeholder="10-digit number" value="' + esc(ui.staffMobile) + '"></div>' +
       '<div class="err-text" id="smobErr"></div>' +
       '<button class="btn btn-gold mt8" id="sendStaffOtp" data-act="sendStaffOtp" disabled>Send OTP</button>' +
       '<div class="demo-hint">Demo staff<br>' + hint + '</div></div>';
   };
-  AFTER.staff = function () { wireMobile('smobile', 'sendStaffOtp', 'smobErr', function () { ACTIONS.sendStaffOtp(); }); };
+  AFTER.staff = function () {
+    wireMobile('smobile', 'sendStaffOtp', 'smobErr', function () { ACTIONS.sendStaffOtp(); }, true);
+    if ($('gsiAdmin')) mountGoogleButton('gsiAdmin', 'adminErr', onAdminCredential);
+  };
+  /* Lucky Draw admin: Google sign-in; only emails on the server's Admin list get the admin role */
+  function onAdminCredential(resp) {
+    var slot = $('gsiAdmin'); if (slot) slot.innerHTML = '<span class="mini-spin" aria-label="Signing in"></span>';
+    ui.adminErr = '';
+    BCAPI.post('/auth/google', { credential: resp.credential }).then(function (u) {
+      ME = u; applyProfile(); SES.authed = true; SES.pending = null; saveSes(); refreshOrders(true);
+      if (u.role === 'admin') { ui.adm = null; go('admin-draw'); }
+      else { ui.adminErr = 'This Google account is not a Lucky Draw admin.'; rerender(); }
+    }).catch(function (e) {
+      ui.adminErr = e.status === 503 ? 'Google sign-in is unavailable right now. Please try again.' : 'Sign-in failed. Please try again.';
+      rerender();
+    });
+  }
+
+  /* ----- Lucky Draw admin: Tonight's draw (status, Seal, Founder's OTP → the draw runs once) ----- */
+  function istTime(iso, secs) { return iso ? new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', second: secs ? '2-digit' : undefined, timeZone: 'Asia/Kolkata' }) : '—'; }
+  function prizeLabel(rank) { return rank === 1 ? '1st prize' : rank === 2 ? '2nd prize' : rank === 3 ? '3rd prize' : 'Lucky 7'; }
+  var ADM_STATUS = { open: ['Taking entries', 'plain'], sealed: ['Sealed · awaiting draw', 'warn'], drawn: ['Drawn', 'ok'], published: ['Published', 'ok'] };
+  function admDay() { var A = ui.adm; return A && A.days ? A.days.filter(function (d) { return d.label === A.sel; })[0] : null; }
+  function admLoad() {
+    var A = ui.adm = ui.adm || { days: null, sel: null, loadedAt: 0 };
+    A.loadedAt = Date.now();
+    return BCAPI.get('/admin/draw-days').then(function (days) {
+      A.days = days;
+      if (!days.some(function (d) { return d.label === A.sel; })) {
+        A.sel = (days.filter(function (d) { return d.status === 'sealed'; })[0] || days[0] || {}).label || null;
+      }
+      if (parse().name === 'admin-draw' && !$('otp')) rerender();
+    }).catch(function (e) {
+      if (e.status === 401 || e.status === 403) { ui.adminErr = 'Please sign in with an admin Google account.'; go('staff'); }
+    });
+  }
+  SCREENS['admin-draw'] = function () {
+    var A = ui.adm, d = admDay();
+    var head = '<div class="staff-head"><span class="ca-ic">' + ic('crown', 22) + '</span><div class="li-main"><div class="ca-t">Lucky Draw admin</div><div class="ca-s">' + esc(ME ? ME.name + ' · ' + ME.email : '') + '</div></div>' +
+      '<button class="iconbtn" data-act="logout" aria-label="Sign out">' + ic('logout') + '</button></div>';
+    if (!A || !A.days) return head + '<div class="pad center mt24"><span class="mini-spin" aria-label="Loading"></span></div>';
+    if (!d) return head + '<div class="pad mt16"><div class="surface sp-empty">' + ic('calendar', 18) + '<span>No draw days yet. A day appears when its first card is entered.</span></div></div>';
+    var st = ADM_STATUS[d.status] || [d.status, 'plain'], body;
+    if (d.status === 'open') body = '<div class="rule-note mt16">' + ic('clock', 16) + '<span>Entries close at ' + istTime(d.closesAt) + '. The ticket list is then sealed automatically.</span></div>';
+    else if (d.status === 'sealed' && !d.canRequestOtp) body = '<div class="rule-note mt16">' + ic('clock', 16) + '<span>Waiting for drand round ' + d.drandRound + ', released at ' + istTime(d.roundReleasedAt, true) + '. The founder’s OTP can be sent after that.</span></div>';
+    else if (d.status === 'sealed' && !d.otpExpiresAt) body = '<button class="btn btn-gold mt16" data-act="admSendOtp">' + ic('phone', 18) + 'Send OTP to founder</button>' +
+      '<p class="fine center">The founder gets a 6-digit code by SMS. It runs this draw only, on the sealed list and the drand round above.</p>';
+    else if (d.status === 'sealed') body = '<div class="field-l">Founder’s OTP</div><div class="otp" id="otp">' + otpBoxes(6) + '</div><div class="err-text" id="otpErr"></div>' +
+      '<button class="btn btn-gold mt16" data-otp-btn data-act="admRun" disabled>' + ic('sparkle', 16) + 'Run the draw</button>' +
+      '<p class="fine center mt12">Code sent · valid until ' + istTime(d.otpExpiresAt) + ' · <a class="link" href="javascript:void(0)" data-act="admSendOtp">Send a new code</a></p>';
+    else body = '<div class="field-l">Winners · drawn at ' + istTime(d.drawnAt, true) + '</div><div class="list">' + (d.winners || []).map(function (x) {
+        return '<div class="li win"><div class="li-main"><div class="li-t">' + prizeLabel(x.rank) + '</div><div class="li-s">#' + x.rank + ' · position ' + x.position + ' in the list</div></div><div class="win-r"><span class="lno">' + esc(x.ticket) + '</span></div></div>';
+      }).join('') + '</div><p class="fine center mt12">Results go public at ' + istTime(d.publishNotBefore) + '.</p>';
+    return head + '<div class="pad"><div class="field-l" style="margin-top:16px">Draw day</div><div class="chips scroll-x">' + A.days.map(function (x) {
+        return '<button class="chip' + (x.label === A.sel ? ' on' : '') + '" data-act="admPick" data-id="' + esc(x.label) + '">' + esc(x.label) + (x.kind === 'test' ? ' · TEST' : '') + '</button>';
+      }).join('') + '</div>' +
+      '<div class="surface mt12" style="padding:4px 16px">' +
+      '<div class="kv"><span>Status</span><span><span class="badge ' + st[1] + '">' + st[0] + '</span>' + (d.kind === 'test' ? ' <span class="badge warn">TEST</span>' : '') + '</span></div>' +
+      '<div class="kv"><span>Tickets</span><span>' + num(d.ticketCount || 0) + '</span></div>' +
+      '<div class="kv"><span>Fingerprint</span><span class="adm-fp">' + (d.fingerprint ? esc(d.fingerprint.slice(0, 16)) + '…' : '—') + '</span></div>' +
+      '<div class="kv"><span>Seal</span><span>' + (d.sealUrl ? '<a class="link" href="' + esc(d.sealUrl) + '" target="_blank" rel="noopener">On GitHub</a>' : d.fingerprint ? 'Publishing to GitHub…' : '—') + '</span></div>' +
+      '<div class="kv"><span>Randomness</span><span>' + (d.drandRound ? 'drand round ' + d.drandRound + ' · ' + istTime(d.roundReleasedAt, true) : '—') + '</span></div></div>' +
+      body + '<p class="fine center mt16">There is no way to redraw or change winners. Running again returns the saved result.</p></div>';
+  };
+  AFTER['admin-draw'] = function () {
+    if (!ui.adm || !ui.adm.days || Date.now() - ui.adm.loadedAt > 10000) admLoad();
+    if ($('otp')) wireOtp(function () { ACTIONS.admRun(); });
+    else timers.push(setInterval(function () { if (!$('otp')) admLoad(); }, 15000));
+  };
 
   SCREENS['staff-otp'] = function () { return otpScreen('staff', ui.staffMobile, 'verifyStaffOtp'); };
   AFTER['staff-otp'] = function () { if (!ui.staffMobile) { go('staff'); return; } wireOtp(function () { ACTIONS.verifyStaffOtp(); }); };
@@ -1820,6 +1895,29 @@
     },
     staffOutlet: function (el) { SES.outlet = el.dataset.id; saveSes(); rerender(); },
     staffLogout: function () { SES.staffId = null; saveSes(); ui.staffMobile = ''; go('welcome'); },
+    admPick: function (el) { ui.adm.sel = el.dataset.id; rerender(); },
+    admSendOtp: function () {
+      var d = admDay(); if (!d || ui.adm.busy) return;
+      ui.adm.busy = true;
+      BCAPI.post('/admin/draw-days/' + encodeURIComponent(d.label) + '/otp').then(function () {
+        ui.adm.busy = false; toast('OTP sent to the founder'); return admLoad().then(rerender);
+      }, function (e) { ui.adm.busy = false; toast(e.message || 'Could not send the OTP'); });
+    },
+    admRun: function () {
+      var d = admDay(); if (!d || ui.adm.busy || !$('otp')) return;
+      var code = Array.prototype.map.call($('otp').querySelectorAll('input'), function (x) { return x.value; }).join('');
+      if (!/^\d{6}$/.test(code)) return;
+      ui.adm.busy = true;
+      BCAPI.post('/admin/draw-days/' + encodeURIComponent(d.label) + '/run', { code: code }).then(function (day) {
+        ui.adm.busy = false;
+        ui.adm.days = ui.adm.days.map(function (x) { return x.label === day.label ? day : x; });
+        rerender(); toast('Draw complete · 10 winners picked'); playChime();
+      }, function (e) {
+        ui.adm.busy = false;
+        if ($('otpErr')) { $('otpErr').textContent = e.message || 'The draw could not run'; otpFail(); }
+        if (e.status === 429 || e.status === 409 || e.status === 401 && /expired/.test(e.message)) admLoad().then(rerender);
+      });
+    },
     lookup: function () {
       var v = $('lookup').value, m = BC_MEMBERS.filter(function (x) { return x.mobile.replace(/\s/g, '') === v; })[0];
       if (!m) { $('lookErr').textContent = 'No Boche member with this number.'; return; }
@@ -2166,6 +2264,7 @@
   var MEMBER_PUBLIC = { welcome: 1, login: 1 };
   var STAFF_PUBLIC = { staff: 1, 'staff-otp': 1 };
   var STAFF_APP = { scan: 1, verify: 1 };
+  var ADMIN_APP = { 'admin-draw': 1 };
   var TABS = { home: 1, explore: 1, card: 1, activity: 1, profile: 1, tea: 1, 'tea-orders': 1, 'my-numbers': 1, 'my-wins': 1, draw: 1, scratch: 1, 'tea-done': 1 };
   /* Tea screens keep the bottom bar (checkout steps don't, they have their own pay bar); Explore is their home tab */
   var TAB_OF = { tea: 'home', 'tea-orders': 'home', draw: 'draw', 'my-numbers': 'draw', 'my-wins': 'draw', activity: 'profile', scratch: 'draw', 'tea-done': 'home' };
@@ -2176,6 +2275,7 @@
   function resolve(r) {
     if (STAFF_PUBLIC[r.name]) return SES.staffId ? { name: 'scan', arg: '' } : r;
     if (STAFF_APP[r.name]) return SES.staffId ? r : { name: 'staff', arg: '' };
+    if (ADMIN_APP[r.name]) return ME && ME.role === 'admin' ? r : { name: 'staff', arg: '' };
     if (!SES.authed) return MEMBER_PUBLIC[r.name] ? r : { name: 'welcome', arg: '' };
     if (SES.pending) return { name: SES.pending, arg: '' };
     if (r.name !== 'tea') ui.teaMenu = false;

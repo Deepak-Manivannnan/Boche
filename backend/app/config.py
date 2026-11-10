@@ -37,6 +37,7 @@ class Settings:
     payment_secret: str = ""  # shared with the (mock) payment provider to sign confirmations
     seals_repo: str = ""  # owner/repo of the public GitHub seals repository
     seals_token: str = ""  # fine-grained token: Contents read/write on that one repository only
+    founder_mobile: str = ""  # PENDING: the Founder's number for the OTP SMS (FOUNDER_MOBILE)
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -52,6 +53,7 @@ class Settings:
             payment_secret=_secret("PAYMENT_WEBHOOK_SECRET"),
             seals_repo=os.environ.get("SEALS_REPO", "").strip(),
             seals_token=os.environ.get("SEALS_GITHUB_TOKEN", "").strip(),
+            founder_mobile=os.environ.get("FOUNDER_MOBILE", "").strip(),
         )
 
 

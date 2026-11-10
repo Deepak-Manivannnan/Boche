@@ -11,3 +11,4 @@ The client asked that the draw only runs after an Admin enters the OTP sent to t
 
 - Withholding the OTP can delay the official result, but cannot hide it: anyone with the Seal and the Randomness round can compute the Winners with the Verifier.
 - The Admin sees the Winners between the Draw run and Publish; this is a known, documented limitation.
+- A Draw run that fails (drand unreachable, or a crash) saves nothing and leaves the OTP valid; the retry uses the same sealed inputs, so it gives the same Winners. Every attempt, including failures and repeats, is appended to a hash-chained run log.

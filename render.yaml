@@ -35,3 +35,6 @@ services:
       # Fine-grained token: Contents read/write on the seals repository only. Set in the dashboard.
       - key: SEALS_GITHUB_TOKEN
         sync: false
+      # PENDING: the Founder's mobile number for the OTP SMS. Until set, the OTP is only written to the logs.
+      - key: FOUNDER_MOBILE
+        sync: false

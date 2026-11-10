@@ -25,6 +25,7 @@ Needs Python 3.11+, a MySQL 8 server and Node (only for one frontend test).
    ADMIN_EMAILS=you@gmail.com
    SESSION_SECRET=<any random string of 32+ characters>
    COOKIE_SECURE=false
+   FOUNDER_MOBILE=           # pending: until set, the Founder's OTP is written to the server log
    ```
 
    The Google client must list `http://localhost` and `http://localhost:8000` as authorised JavaScript origins. Open the app at `http://localhost:8000`, not `127.0.0.1`.
