@@ -50,6 +50,60 @@ def clean_db(db_engine):
     _delete_all_rows(db_engine)
 
 
+from api_support import PAYMENT_SECRET  # noqa: E402
+
+
+class FakeGoogle:
+    """Stands in for Google: a credential "<name>-token-xxxxxxxxxx" signs in as <name>."""
+
+    def __call__(self, credential: str):
+        from app.auth import AuthError, GoogleIdentity
+
+        name = credential.split("-token-")[0]
+        if not credential.endswith("-token-xxxxxxxxxx") or not name.isalpha():
+            raise AuthError("bad token")
+        return GoogleIdentity(
+            sub=f"g-{name}", email=f"{name}@example.com", name=f"{name.title()} Tester", picture=None
+        )
+
+
+@pytest.fixture
+def make_client(migrated_url, clean_db):
+    """make_client(name) -> a TestClient signed in as that Customer, all sharing one app and database."""
+    from datetime import UTC, datetime
+
+    from fastapi.testclient import TestClient
+
+    from app.clock import FixedClock
+    from app.config import Settings
+    from app.main import create_app
+
+    settings = Settings(
+        database_url=migrated_url,
+        google_client_id="test-client",
+        session_secret="s" * 32,
+        admin_emails=frozenset({"admin@example.com"}),
+        cookie_secure=False,
+        payment_secret=PAYMENT_SECRET,
+    )
+    clock = FixedClock(datetime(2026, 11, 10, 6, 30, tzinfo=UTC))  # 12:00 IST
+    app = create_app(settings=settings, verify_google=FakeGoogle(), clock=clock)
+    app.state.test_clock = clock
+    clients = []
+
+    def make(name: str | None = "arun") -> TestClient:
+        client = TestClient(app)
+        clients.append(client)
+        if name:
+            res = client.post("/api/auth/google", json={"credential": f"{name}-token-xxxxxxxxxx"})
+            assert res.status_code == 200, res.text
+        return client
+
+    yield make
+    for client in clients:
+        client.close()
+
+
 @pytest.fixture
 def session(db_engine):
     """A session inside a transaction that is always rolled back, so tests never leak rows."""

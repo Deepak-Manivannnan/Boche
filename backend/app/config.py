@@ -34,23 +34,27 @@ class Settings:
     session_secret: str  # signs session cookies; never leaves the server
     admin_emails: frozenset[str]  # lower-case emails allowed to act as Admin
     cookie_secure: bool  # True behind HTTPS (Render), False on http://localhost
+    payment_secret: str = ""  # shared with the (mock) payment provider to sign confirmations
 
     @classmethod
     def from_env(cls) -> "Settings":
         load_env()
-        secret = os.environ.get("SESSION_SECRET", "")
-        if len(secret) < 32:
-            # Development fallback: sessions last until the server restarts. Production sets a real secret.
-            print(
-                "WARNING: SESSION_SECRET missing or short; using a random per-process secret", file=sys.stderr
-            )
-            secret = secrets.token_urlsafe(48)
         return cls(
             database_url=database_url(),
             google_client_id=os.environ.get("GOOGLE_CLIENT_ID", "").strip(),
-            session_secret=secret,
+            session_secret=_secret("SESSION_SECRET"),
             admin_emails=frozenset(
                 e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()
             ),
             cookie_secure=os.environ.get("COOKIE_SECURE", "false").strip().lower() == "true",
+            payment_secret=_secret("PAYMENT_WEBHOOK_SECRET"),
         )
+
+
+def _secret(name: str) -> str:
+    value = os.environ.get(name, "")
+    if len(value) < 32:
+        # Development fallback, valid until the server restarts. Production sets a real secret.
+        print(f"WARNING: {name} missing or short; using a random per-process secret", file=sys.stderr)
+        value = secrets.token_urlsafe(48)
+    return value

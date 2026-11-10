@@ -2,7 +2,7 @@
 
 import json
 
-from conftest import DAY, drand_response
+from drawfiles import DAY, drand_response
 
 import verify
 

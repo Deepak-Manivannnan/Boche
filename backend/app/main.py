@@ -1,5 +1,6 @@
 """FastAPI application: the /api routes plus the prototype frontend on the same origin (ADR-0005)."""
 
+import secrets
 from dataclasses import replace
 from pathlib import Path
 
@@ -27,6 +28,8 @@ def create_app(
         settings = Settings.from_env() if database_url is None else _minimal_settings(database_url)
     elif database_url is not None:
         settings = replace(settings, database_url=database_url)
+    if len(settings.payment_secret) < 32:
+        settings = replace(settings, payment_secret=secrets.token_urlsafe(48))
     clock = clock or SystemClock()
 
     app = FastAPI(title="Boche Lucky Draw")
@@ -62,8 +65,10 @@ def create_app(
         return {"status": "ok", "database": "connected"}
 
     from app.routes_auth import router as auth_router
+    from app.routes_orders import router as orders_router
 
     app.include_router(auth_router)
+    app.include_router(orders_router)
 
     # Mounted last so every /api route above takes precedence over static files.
     app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

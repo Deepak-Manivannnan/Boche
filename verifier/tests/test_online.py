@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-from conftest import CHAIN, DAY, DrawFiles
+from drawfiles import CHAIN, DAY, DrawFiles
 
 import verify
 

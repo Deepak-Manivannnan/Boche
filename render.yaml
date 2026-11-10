@@ -18,6 +18,9 @@ services:
         sync: false
       - key: SESSION_SECRET
         generateValue: true
+      # Signs (mock) payment confirmations; only the server and the mock provider know it.
+      - key: PAYMENT_WEBHOOK_SECRET
+        generateValue: true
       - key: COOKIE_SECURE
         value: "true"
       # Public by design: the Google client ID is sent to every browser.

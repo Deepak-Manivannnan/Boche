@@ -85,7 +85,9 @@ class Order(Base):
     )
     subtotal_paise: Mapped[int] = mapped_column(sa.Integer)
     logistics_paise: Mapped[int] = mapped_column(sa.Integer)
-    gst_paise: Mapped[int] = mapped_column(sa.Integer)
+    tea_gst_paise: Mapped[int] = mapped_column(sa.Integer, default=0, server_default="0")
+    logistics_gst_paise: Mapped[int] = mapped_column(sa.Integer, default=0, server_default="0")
+    gst_paise: Mapped[int] = mapped_column(sa.Integer)  # tea + logistics GST, rounded up to a whole rupee
     total_paise: Mapped[int] = mapped_column(sa.Integer)
     delivery: Mapped[dict | None] = mapped_column(sa.JSON)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

@@ -308,7 +308,7 @@
     var slot = $('gsiBtn'); if (slot) slot.innerHTML = '<span class="mini-spin" aria-label="Signing in"></span>';
     ui.signInErr = '';
     BCAPI.post('/auth/google', { credential: resp.credential }).then(function (u) {
-      ME = u; applyProfile(); SES.authed = true; SES.pending = null; saveSes();
+      ME = u; applyProfile(); SES.authed = true; SES.pending = null; saveSes(); refreshOrders(true);
       go('home'); toast('Welcome, ' + BC_MEMBER.firstName);
     }).catch(function (e) {
       ui.signInErr = e.status === 503 ? 'Google sign-in is unavailable right now. Please try again.' : 'Sign-in failed. Please try again.';
@@ -898,7 +898,7 @@
     return won ? ['Won', 'ok'] : toEnter ? ['To enter', 'warn'] : pending ? ['Pending', 'plain'] : ['Next time', 'plain'];
   }
   SCREENS['tea-orders'] = function () {
-    var orders = dyn(BC_MEMBER.id).teaOrders || [];
+    var orders = teaOrders();
     return topbar('My orders', 'tea') + '<div class="pad tea-page">' +
       (orders.length ? '<div class="otable"><div class="ot-row ot-h"><span>#</span><span>Date</span><span>Order ID</span><span>Draw</span><span></span></div>' +
         orders.map(function (o, i) {
@@ -1185,7 +1185,7 @@
   };
 
   SCREENS['tea-done'] = function (id) {
-    var o = (dyn(BC_MEMBER.id).teaOrders || []).filter(function (x) { return x.id === id; })[0];
+    var o = teaOrders().filter(function (x) { return x.id === id; })[0];
     if (!o) return SCREENS.home();
     return '<div class="auth"><div class="verified-hero"><div class="big-check">' + ic('check', 36) + '</div>' +
       '<h1>Order placed</h1><p class="lead">Arriving in ' + esc(BC_TEA.eta) + ' at ' + esc(o.area.po || o.area.district) + '.</p></div>' +
@@ -1224,12 +1224,7 @@
   function drawDone(key) { return key < dayKey() || (key === dayKey() && new Date().getHours() >= BC_DRAW.drawHour); }
   function seeded(str) { var h = 2166136261; for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return function () { h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); h ^= h >>> 16; return (h >>> 0) / 4294967296; }; }
   function luckyNo(rnd) { var L = BC_DRAW.letters; return L[Math.floor(rnd() * L.length)] + L[Math.floor(rnd() * L.length)] + ' ' + String(Math.floor(rnd() * 1e6) + 1e6).slice(1); }
-  /* Unique for the day it is issued (the server enforces this in production) */
-  function issueLuckyNo() {
-    var st = drawState(), k = dayKey(), used = st.issued[k] = st.issued[k] || [], no;
-    do { no = luckyNo(Math.random); } while (used.indexOf(no) > -1);
-    used.push(no); return no;
-  }
+  /* Lucky numbers are issued by the server after a confirmed payment (backend/app/ticketing.py) */
   function drawWinnerCount() { return BC_DRAW.prizes.reduce(function (t, p) { return t + p.count; }, 0); }
   function maskMobile(m) { var d = m.replace(/\D/g, ''); return '••••• ' + d.slice(-5); }
   /* Runs (once) and stores a day's draw: real entries plus the simulated pool */
@@ -1262,9 +1257,43 @@
   /* Every tea pack bought = one scratch card; the card carries that pack's count of lucky numbers */
   function allCards() {
     var out = [];
-    (dyn(BC_MEMBER.id).teaOrders || []).forEach(function (o) { (o.cards || []).forEach(function (c) { out.push({ o: o, c: c }); }); });
+    teaOrders().forEach(function (o) { (o.cards || []).forEach(function (c) { out.push({ o: o, c: c }); }); });
     return out;
   }
+  /* Orders, cards and lucky numbers come from the server (/api/me/orders). Until tickets 07 and 10 move
+     entering and claiming to the server, those two flags are remembered on this device per card. */
+  var ORDERS = null, ordersAt = 0;
+  var ORDER_SCREENS = { 'tea-orders': 1, 'tea-done': 1, 'my-numbers': 1, 'my-wins': 1, draw: 1, scratch: 1, claim: 1 };
+  function teaOrders() { return ORDERS || []; }
+  function cardLocal() { return S.cardLocal = S.cardLocal || {}; }
+  function rememberCardLocal(c) { cardLocal()[c.id] = { submitted: c.submitted, drawDate: c.drawDate, claimed: c.claimed || null }; save(); }
+  function fromServerOrder(o) {
+    function r(p) { return p / 100; }
+    var d = o.delivery || {}, local = cardLocal();
+    return {
+      id: o.id, ts: o.ts, date: new Date(o.ts).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      items: o.items.map(function (i) { return { size: i.size, qty: i.qty, price: r(i.unitPricePaise) }; }),
+      tea: r(o.subtotalPaise), logistics: r(o.logisticsPaise), gst: { tea: r(o.teaGstPaise), log: r(o.logisticsGstPaise), total: r(o.gstPaise) },
+      tax: r(o.gstPaise), taxRate: o.teaGstRate, total: r(o.totalPaise),
+      addr: { pin: d.pin, name: d.name, house: d.house, street: d.street }, area: { po: d.po, district: d.district },
+      cards: o.cards.map(function (c) {
+        var l = local[c.id] || {};
+        return { id: c.id, pack: c.size, nos: c.numbers, scratched: c.scratched, submitted: !!l.submitted, drawDate: l.drawDate || null, claimed: l.claimed || null };
+      })
+    };
+  }
+  function setOrders(list) { ORDERS = list.map(fromServerOrder); ordersAt = Date.now(); }
+  /* Fetch my orders; re-draw the screen only if something changed and the member isn't mid-scratch */
+  function refreshOrders(force) {
+    if (!SES.authed || (!force && Date.now() - ordersAt < 10000)) return Promise.resolve();
+    ordersAt = Date.now();
+    var before = JSON.stringify(ORDERS);
+    return BCAPI.get('/me/orders').then(function (list) {
+      setOrders(list);
+      if (JSON.stringify(ORDERS) !== before && ORDER_SCREENS[parse().name] && parse().name !== 'scratch') rerender();
+    }).catch(function (e) { if (e.status === 401) ACTIONS.logout(); });
+  }
+  function markScratched(cid) { BCAPI.post('/cards/' + encodeURIComponent(cid) + '/scratch').catch(function () {}); }
   function cardById(cid) { return allCards().filter(function (x) { return x.c.id === cid; })[0]; }
   function nextDrawKey() { return new Date().getHours() < BC_DRAW.drawHour ? dayKey() : dayShift(dayKey(), 1); }
   function numsLabel(n) { return n === 1 ? '1 lucky number' : n + ' lucky numbers'; }
@@ -1393,7 +1422,7 @@
       for (var i = 3; i < d.length; i += 64) { n++; if (d[i] < 40) clear++; }
       if (!seen && clear / n > 0.12) {
         seen = true;
-        var x = cardById(id); if (!x.c.scratched) { x.c.scratched = true; save(); }
+        var x = cardById(id); if (!x.c.scratched) { x.c.scratched = true; markScratched(id); }
         $('scBody').innerHTML = scratchBody(x);
         var rv = document.querySelector('.sc-reveal'); if (rv) rv.remove();
       }
@@ -1933,11 +1962,17 @@
       d.profile.email = ui.em.email; d.profile.emailVerified = true; save(); applyProfile();
       ui.em = null; toast('Email verified'); if (navStack.length > 1) history.back(); else go('profile');
     },
-    /* Pay: UPI app chooser → simulated Google Pay screen → UPI PIN → order placed (prototype: no real payment) */
+    /* Pay: the server prices the order first; UPI app chooser → simulated Google Pay screen → UPI PIN →
+       mock provider confirms with a signed message → the server issues the scratch cards (nothing is charged) */
     teaPay: function () {
-      var sub = teaSubtotal(), lg = teaLogistics(), g = teaGst(sub, lg);
-      ui.pay = { sub: sub, lg: lg, g: g, tot: Math.round((sub + lg + g.total) * 100) / 100, app: 'gpay', pin: '' };
-      ui.sheetLock = false; payChooser();
+      if (ui.pay && ui.pay.busy) return;
+      var sub = teaSubtotal(), lg = teaLogistics(), g = teaGst(sub, lg), items = {};
+      teaItems().forEach(function (i) { items[i.pack.id] = i.qty; });
+      ui.pay = { sub: sub, lg: lg, g: g, tot: Math.round((sub + lg + g.total) * 100) / 100, app: 'gpay', pin: '', busy: true };
+      var a = ui.tea.addr, area = ui.tea.area;
+      BCAPI.post('/orders', { items: items, delivery: { name: a.name.trim(), house: a.house.trim(), street: a.street.trim(), pin: a.pin, po: area.po || '', district: area.district } })
+        .then(function (o) { ui.pay.orderId = o.id; ui.pay.tot = o.totalPaise / 100; ui.pay.busy = false; ui.sheetLock = false; payChooser(); })
+        .catch(function (e) { ui.pay = null; toast(e.status === 401 ? 'Please sign in again' : e.status === 422 ? 'Please check your bag and address' : 'Could not start the payment. Try again.'); if (e.status === 401) ACTIONS.logout(); });
     },
     payApp: function (el) { ui.pay.app = el.dataset.app; payApp(); },
     payPin: function () { ui.pay.pin = ''; payPinSheet(); },
@@ -1948,33 +1983,29 @@
         ui.sheetLock = true;
         setTimeout(function () {
           openSheet('<div class="gp-done" id="gpDone"><span class="gp-spin"></span><b>Processing payment…</b><span>Do not press back</span></div>');
-          setTimeout(function () {
+          var minWait = new Promise(function (res) { setTimeout(res, 1300); });
+          Promise.all([BCAPI.post('/payments/mock/' + encodeURIComponent(P.orderId) + '/pay'), minWait]).then(function (r) {
             $('gpDone').innerHTML = '<span class="gp-ok">' + ic('check', 30) + '</span><b>Payment successful</b><span>' + inr(P.tot) + ' paid to Boche</span>';
-            setTimeout(function () { ui.sheetLock = false; closeSheet(); ACTIONS.teaPlace(); }, 1100);
-          }, 1300);
+            setTimeout(function () { ui.sheetLock = false; closeSheet(); ACTIONS.teaPlace(r[0]); }, 1100);
+          }).catch(function () {
+            ui.sheetLock = false; closeSheet(); ui.pay = null; toast('Payment could not be confirmed. Nothing was charged; please try again.');
+          });
         }, 250);
       }
     },
     pinDel: function () { var P = ui.pay; if (!P || P.pin.length >= 4) return; P.pin = P.pin.slice(0, -1); payDots(); },
-    teaPlace: function () {
-      var sub = ui.pay.sub, lg = ui.pay.lg, g = ui.pay.g, tot = ui.pay.tot;
-      var d = dyn(BC_MEMBER.id), id = 'TEA-' + Math.floor(100000 + Math.random() * 899999);
-      d.teaOrders = d.teaOrders || [];
-      d.teaOrders.unshift({ id: id, date: todayLabel(), ts: Date.now(), items: teaItems().map(function (i) { return { size: i.pack.size, qty: i.qty, price: i.pack.price }; }),
-        tea: sub, logistics: lg, gst: g, tax: g.total, taxRate: BC_TEA.taxRate, total: tot, cards: teaItems().reduce(function (all, i) {
-          for (var q = 0; q < i.qty; q++) {
-            var nos = []; for (var k = 0; k < i.pack.numbers; k++) nos.push(issueLuckyNo());
-            all.push({ id: id + '-' + (all.length + 1), pack: i.pack.size, nos: nos, scratched: false, submitted: false, drawDate: null });
-          }
-          return all;
-        }, []), addr: JSON.parse(JSON.stringify(ui.tea.addr)), area: { po: ui.tea.area.po, district: ui.tea.area.district } });
+    /* The server has confirmed the payment and issued the cards: show the order it returned */
+    teaPlace: function (paid) {
+      var sub = ui.pay.sub, d = dyn(BC_MEMBER.id);
+      var mine = fromServerOrder(paid);
+      ORDERS = [mine].concat(teaOrders().filter(function (o) { return o.id !== mine.id; }));
       if (ui.tea.pick === 'new' || !addrList().length) { var nsv = addrToSaved(ui.tea); nsv.label = addrList().some(function (a) { return a.label === 'Home'; }) ? 'Other' : 'Home'; ui.tea.pick = addrUpsert(nsv).id; }
       d.spend.tea = (d.spend.tea || 0) + sub;
       save();
-      ui.tea.qty = teaBlankBag();
-      go('tea-done/' + id);
+      ui.tea.qty = teaBlankBag(); ui.pay = null;
+      go('tea-done/' + mine.id);
     },
-    scratchReveal: function (el) { var x = cardById(el.dataset.id); if (!x || x.c.scratched) return; x.c.scratched = true; save(); rerender(); },
+    scratchReveal: function (el) { var x = cardById(el.dataset.id); if (!x || x.c.scratched) return; x.c.scratched = true; markScratched(x.c.id); rerender(); },
     drawSubmit: function (el) {
       var x = cardById(el.dataset.id); if (!x || x.c.submitted) return;
       var c = x.c;
@@ -1986,7 +2017,7 @@
         var key = nextDrawKey(), st = drawState();
         st.entries[key] = st.entries[key] || [];
         c.nos.forEach(function (no) { st.entries[key].push({ no: no, member: BC_MEMBER.id, order: x.o.id, card: c.id, ts: Date.now() }); });
-        c.submitted = true; c.drawDate = key; save(); ui.justEntered = c.id; rerender(); ui.justEntered = null; playChime();
+        c.submitted = true; c.drawDate = key; rememberCardLocal(c); ui.justEntered = c.id; rerender(); ui.justEntered = null; playChime();
       }, 550);
     },
     /* Claim a Lucky Draw win: confirm payout account → paid (prototype: nothing is really sent) */
@@ -1999,7 +2030,7 @@
         ['Sending your details', 'Verifying your lucky number', 'Claim received'].map(function (s) { return '<li><span class="st"></span>' + esc(s) + '</li>'; }).join('') + '</ul>');
       runSteps($('claimSteps').children, function () {
         ui.sheetLock = false; x.c.claimed = { ts: Date.now(), amount: q.amount, ref: 'CLM-' + Math.floor(100000 + Math.random() * 899999) };
-        save(); closeSheet(); rerender(); toast('Claim submitted');
+        rememberCardLocal(x.c); closeSheet(); rerender(); toast('Claim submitted');
       }, 600);
     },
     drawNow: function () { drawResults(dayKey(), true); rerender(); },
@@ -2096,7 +2127,7 @@
     logout: function () {
       BCAPI.post('/auth/logout').catch(function () {});
       try { window.google.accounts.id.disableAutoSelect(); } catch (e) {}
-      ME = null; applyProfile(); SES.authed = false; SES.pending = null; saveSes(); go('welcome');
+      ME = null; ORDERS = null; ordersAt = 0; applyProfile(); SES.authed = false; SES.pending = null; saveSes(); go('welcome');
     },
     closeSheet: function () { closeSheet(); },
     wxClose: function () { var w = $('wx'); if (!w) return; w.classList.add('out'); setTimeout(function () { w.remove(); rerender(); }, 350); },
@@ -2163,6 +2194,7 @@
     scr.scrollTop = keepScroll ? top : 0;
     renderTabs(TAB_OF[r.name] || r.name);
     if (AFTER[r.name]) AFTER[r.name](r.arg);
+    if (!keepScroll && ORDER_SCREENS[r.name]) refreshOrders();   /* pick up orders placed on another device */
   }
   function rerender() { clearTimers(); render(true); }
 
@@ -2247,6 +2279,8 @@
     if (r[1]) { ME = r[1]; SES.authed = true; SES.pending = null; }
     else if (r[1] === null) { ME = null; SES.authed = false; SES.pending = null; }
     applyProfile(); saveSes();
-    render();
+    if (!SES.authed) { render(); return; }
+    /* Signed in: load my orders before the first screen so cards and numbers are there straight away */
+    refreshOrders(true).then(render, render);
   });
 })();
