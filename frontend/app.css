@@ -1524,3 +1524,8 @@ a.hm-cta, .hm-cta { min-height: 30px; }
 .gsi-slot > div { width: 100%; display: flex; justify-content: center; }
 /* Lucky Draw admin: fingerprints are long hex strings */
 .adm-fp { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; word-break: break-all; }
+/* Verify the draw */
+.vd-steps { margin: 8px 0 12px; padding-left: 20px; font-size: 14px; line-height: 1.5; }
+.vd-steps li { margin: 6px 0; }
+.vd-steps code, .kv code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; }
+.vd-on { box-shadow: 0 0 0 2px var(--gold); }

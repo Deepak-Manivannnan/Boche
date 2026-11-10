@@ -268,7 +268,7 @@
       '<p class="wl-sub">Sign in or join with your Google account</p>' +
       '<div class="gsi-slot" id="gsiBtn"><span class="mini-spin" aria-label="Loading Google sign-in"></span></div>' +
       '<div class="err-text" id="mobErr">' + esc(ui.signInErr || '') + '</div>' +
-      '<p class="wl-legal">Free to join</p></div></div>';
+      '<p class="wl-legal">Free to join · <a class="link" href="#/verify-draw">Verify past draws</a></p></div></div>';
   };
   SCREENS.login = SCREENS.welcome;
   function wireMobile(inpId, btnId, errId, onEnter, noFocus) {
@@ -1224,7 +1224,7 @@
   function drawWinnerCount() { return BC_DRAW.prizes.reduce(function (t, p) { return t + p.count; }, 0); }
   /* Published results come from the server (/api/public/days): the ten Winners the draw engine picked from
      the sealed list and drand. A day with no published result returns null. There is no simulated draw. */
-  var RESULTS = {}, resultsAt = 0;
+  var RESULTS = {}, PUBLIC_DAYS = null, resultsAt = 0;
   function myNumbers() { var s = {}; allCards().forEach(function (x) { x.c.nos.forEach(function (n) { s[n] = 1; }); }); return s; }
   function drawResults(key) {
     var list = RESULTS[key]; if (!list) return null;
@@ -1237,8 +1237,8 @@
     var before = JSON.stringify(RESULTS);
     return BCAPI.get('/public/days').then(function (days) {
       var next = {}; days.forEach(function (d) { if (d.winners) next[d.label] = d.winners; });
-      RESULTS = next;
-      if (JSON.stringify(RESULTS) !== before && ORDER_SCREENS[parse().name] && parse().name !== 'scratch') rerender();
+      RESULTS = next; PUBLIC_DAYS = days;
+      if (JSON.stringify(RESULTS) !== before && (ORDER_SCREENS[parse().name] || parse().name === 'verify-draw') && parse().name !== 'scratch') rerender();
     }).catch(function () {});
   }
   /* Every tea pack bought = one scratch card; the card carries that pack's count of lucky numbers */
@@ -1441,7 +1441,7 @@
     var calendar = '<div class="cal"><div class="cal-w">' + ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(function (d) { return '<span>' + d + '</span>'; }).join('') + '</div><div class="cal-g">' + cells + '</div>' +
       '<div class="cal-key"><span><i class="k-d"></i>Draw held</span><span><i class="k-w"></i>You won</span></div></div>' +
       '<div class="sec-h" style="padding:0;margin:16px 0 8px"><h3>' + esc(dayLabel(sel)) + (sel === today || sel === dayShift(today, -1) ? ' · ' + esc(new Date(sel + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })) : '') + '</h3><span class="li-s">' + (selRes ? selRes.length + ' winners' : 'Draw at ' + drawTimeLabel()) + '</span></div>' +
-      (selRes ? winners(selRes) : '<div class="surface draw-wait"><div class="li-s">Winners appear here after the ' + drawTimeLabel() + ' draw.</div></div>');
+      (selRes ? winners(selRes) + verifyLink(sel) : '<div class="surface draw-wait"><div class="li-s">Winners appear here after the ' + drawTimeLabel() + ' draw.</div></div>');
     return topbar('Lucky Draw', 'home') + '<div class="pad">' +
       '<div class="draw-hero"><span class="hm-eyebrow">' + ic('gift', 14) + 'Every day at ' + drawTimeLabel() + '</span>' +
         '<div class="dh-top">' + inr(BC_DRAW.prizes[0].amount) + '</div><div class="dh-s">1st prize · ' + drawWinnerCount() + ' winners daily</div>' +
@@ -1450,7 +1450,7 @@
         return '<button class="alert alert-btn" data-go="scratch/' + c.id + '">' + ic('sparkle', 18) + '<span>' + (c.scratched ? 'Enter your ' + numsLabel(c.nos.length) : 'Scratch card to open · ' + numsLabel(c.nos.length)) + '</span>' + ic('chev', 16) + '</button>';
       }).join('') : '') +
       '<div class="sec-h" style="padding:0;margin-top:22px"><h3>Today · ' + esc(new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })) + '</h3></div>' +
-      (res ? winners(res)
+      (res ? winners(res) + verifyLink(today)
         : '<div class="surface draw-wait"><div class="dw-k">Results in</div><div class="dw-v" id="drawCd"></div>' +
           '<div class="li-s">' + (todayNos.length ? 'Your ' + (todayNos.length > 1 ? todayNos.length + ' numbers' : 'number') + ' in today’s draw' : 'No entries from you yet. Order tea to get a scratch card.') + '</div>' +
           (todayNos.length ? '<div class="chips mt8">' + todayNos.map(function (no) { return '<span class="lno big">' + esc(no) + '</span>'; }).join('') + '</div>' : '') +
@@ -1474,6 +1474,38 @@
       el.textContent = (h ? h + 'h ' : '') + ('0' + m).slice(-2) + 'm ' + ('0' + s).slice(-2) + 's';
     }
     tick(); timers.push(setInterval(tick, 1000));
+  };
+
+  /* ----- Verify the draw (public): every closed Draw day's files, its Seal on GitHub, its drand round, and the Verifier ----- */
+  var DRAND_CHAIN = '52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971';
+  function verifyLink(label) { return '<a class="btn btn-line btn-sm mt12" href="#/verify-draw/' + encodeURIComponent(label) + '">' + ic('shield', 15) + 'Verify this draw</a>'; }
+  SCREENS['verify-draw'] = function (focus) {
+    var days = PUBLIC_DAYS, api = '/api/public/days/';
+    function dl(href, text) { return '<a class="link" href="' + esc(href) + '" target="_blank" rel="noopener">' + esc(text) + '</a>'; }
+    var guide = '<div class="surface" style="padding:4px 16px"><div class="field-l" style="margin-top:12px">Check any draw yourself</div>' +
+      '<ol class="vd-steps"><li>Install Python 3.11 or newer. Nothing else is needed.</li>' +
+      '<li>Download ' + dl('/api/public/verifier/verify.py', 'verify.py') + ' (also on GitHub with the source).</li>' +
+      '<li>Run <code>python verify.py 2026-11-10</code> with the draw day. It downloads the files below, the Seal from GitHub and the randomness from drand, re-runs the draw and prints <b>VERIFIED</b> or what failed.</li></ol></div>';
+    var list = days === null ? '<div class="center mt16"><span class="mini-spin" aria-label="Loading"></span></div>'
+      : !days.length ? '<div class="surface sp-empty mt16">' + ic('calendar', 18) + '<span>No draw has closed yet. Each day closes at 8:00 PM IST.</span></div>'
+      : days.map(function (d) {
+        var pub = d.status === 'published', on = focus && focus === d.label;
+        return '<div class="surface mt12' + (on ? ' vd-on' : '') + '" style="padding:4px 16px" id="vd-' + esc(d.label) + '">' +
+          '<div class="kv"><span><b>' + esc(d.label) + '</b>' + (d.kind === 'test' ? ' <span class="badge warn">TEST</span>' : '') + '</span><span><span class="badge ' + (pub ? 'ok' : 'plain') + '">' + (pub ? 'Published' : 'Sealed · result at 8:30 PM') + '</span></span></div>' +
+          '<div class="kv"><span>Tickets</span><span>' + num(d.ticketCount || 0) + '</span></div>' +
+          '<div class="kv"><span>Fingerprint</span><span class="adm-fp">' + esc(d.fingerprint || '') + '</span></div>' +
+          '<div class="kv"><span>Seal</span><span>' + (d.sealUrl ? dl(d.sealUrl, 'On GitHub') : 'Publishing…') + ' · ' + dl(api + d.label + '/seal.json', 'seal.json') + '</span></div>' +
+          '<div class="kv"><span>Randomness</span><span>' + dl('https://api.drand.sh/' + DRAND_CHAIN + '/public/' + d.drandRound, 'drand round ' + d.drandRound) + '</span></div>' +
+          '<div class="kv"><span>Files</span><span>' + dl(api + d.label + '/tickets.csv', 'tickets.csv') + (pub ? ' · ' + dl(api + d.label + '/result.json', 'result.json') : '') + '</span></div>' +
+          '<div class="kv"><span>Command</span><span><code>python verify.py ' + esc(d.label) + '</code></span></div></div>';
+      }).join('');
+    return topbar('Verify the draw', SES.authed ? 'draw' : 'welcome', ' ') + '<div class="pad">' +
+      '<p class="sub">Every night’s winners follow from two public things: the ticket list sealed at 8:00 PM and a random number from drand that nobody knew in advance. You can check both.</p>' +
+      guide + '<div class="field-l">Draw days</div>' + list + '</div>';
+  };
+  AFTER['verify-draw'] = function (focus) {
+    refreshResults(true);
+    var el = focus && $('vd-' + focus); if (el) el.scrollIntoView({ block: 'center' });
   };
 
   /* ============================================================
@@ -2262,6 +2294,7 @@
     if (STAFF_PUBLIC[r.name]) return SES.staffId ? { name: 'scan', arg: '' } : r;
     if (STAFF_APP[r.name]) return SES.staffId ? r : { name: 'staff', arg: '' };
     if (ADMIN_APP[r.name]) return ME && ME.role === 'admin' ? r : { name: 'staff', arg: '' };
+    if (r.name === 'verify-draw') return r;   /* public: anyone can check a draw, signed in or not */
     if (!SES.authed) return MEMBER_PUBLIC[r.name] ? r : { name: 'welcome', arg: '' };
     if (SES.pending) return { name: SES.pending, arg: '' };
     if (r.name !== 'tea') ui.teaMenu = false;

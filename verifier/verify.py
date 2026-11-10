@@ -44,7 +44,7 @@ DRAND_RELAYS = [
 ]
 
 DEFAULT_SITE = "https://boche.onrender.com"
-DEFAULT_SEALS_REPO = "boche-lucky-draw/boche-draw-seals"
+DEFAULT_SEALS_REPO = "Deepak-Manivannnan/boche-draw-seals"
 
 # Check names, in the order they run
 FILES = "Public files downloaded"

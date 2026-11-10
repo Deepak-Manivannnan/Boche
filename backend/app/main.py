@@ -3,7 +3,6 @@
 import logging
 import secrets
 from dataclasses import replace
-from pathlib import Path
 
 import sqlalchemy as sa
 from fastapi import FastAPI, Request
@@ -14,7 +13,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.auth import GoogleTokenVerifier, Sessions
 from app.clock import Clock, SystemClock
-from app.config import Settings
+from app.config import REPO_ROOT, Settings
 from app.drand import fetch_round
 from app.lifecycle import advance
 from app.otp import LogOtpSender
@@ -22,7 +21,7 @@ from app.seals import GitHubSealPublisher
 
 log = logging.getLogger("boche")
 
-FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
+FRONTEND_DIR = REPO_ROOT / "frontend"
 
 
 def create_app(

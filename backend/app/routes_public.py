@@ -4,10 +4,11 @@ from typing import Annotated
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Path, Request
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 
 from app import models as m
+from app.config import REPO_ROOT
 from app.deps import get_db
 from app.lifecycle import advance
 from app.results import result_json, winners_public
@@ -80,3 +81,11 @@ def recent_days(db: Db) -> list[dict]:
         }
         for d in days
     ]
+
+
+@router.get("/public/verifier/verify.py")
+def download_verifier() -> FileResponse:
+    """The standalone Verifier, byte for byte as in the repository (verifier/verify.py)."""
+    return FileResponse(
+        REPO_ROOT / "verifier" / "verify.py", media_type="text/x-python; charset=utf-8", filename="verify.py"
+    )

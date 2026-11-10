@@ -18,7 +18,9 @@ python verify.py 2026-11-10 --from-dir ./2026-11-10
 
 If the folder also holds `drand.json`, the randomness is read from it. Otherwise it is fetched live from drand's public relays.
 
-Options: `--site URL` (Boche site, default `https://boche.onrender.com`) and `--seals-repo owner/repo` (the public GitHub repository of Seals).
+Options: `--site URL` (default `https://boche.onrender.com`) and `--seals-repo owner/repo` (default `Deepak-Manivannnan/boche-draw-seals`, the public GitHub repository of Seals).
+
+You can also download `verify.py` from the app's **Verify the draw** page (`https://boche.onrender.com/#/verify-draw`), which lists every closed Draw day with its files, its Seal on GitHub and its drand round.
 
 ## What it checks
 
