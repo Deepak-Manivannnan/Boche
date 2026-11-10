@@ -4,8 +4,10 @@ version = "0.1.0"
 requires-python = ">=3.11"
 
 [tool.pytest.ini_options]
-pythonpath = [".", "backend"]
-testpaths = ["backend/tests", "engine/tests"]
+pythonpath = [".", "backend", "verifier"]
+testpaths = ["backend/tests", "engine/tests", "verifier/tests"]
+markers = ["network: needs internet access (drand relays); run with -m network, skipped by default"]
+addopts = "-m 'not network'"
 
 [tool.ruff]
 line-length = 110
