@@ -4,5 +4,5 @@ The developer chose MySQL. Render offers no MySQL (only Postgres, whose free tie
 
 ## Consequences
 
-- TiDB differs from MySQL in small ways (notably locking behaviour and auto-increment ID allocation). Uniqueness and idempotency are enforced with unique constraints rather than relying on lock or ID ordering.
-- Connections must use TLS.
+- TiDB differs from MySQL in small ways (notably locking behaviour and auto-increment ID allocation). Uniqueness and idempotency are enforced with unique constraints rather than relying on lock or ID ordering. The full database test suite passes unchanged on both MySQL 8.0 and TiDB v8.5, so local development uses MySQL and production uses TiDB.
+- Connections must use TLS with certificate and hostname verification.

@@ -4,7 +4,7 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-human (04a done locally; 04b needs the developer's TiDB, Render and GitHub accounts)
+**Status:** done
 
 ### 04a: local (done)
 - [x] Migrations create users (with role), orders, order_items, payments, cards, tickets (lucky numbers unique), draw_days, draw_results (one per Draw day), draw_runs (append-only, hash-chain fields, unique sequence), otp_challenges, claims
@@ -16,5 +16,5 @@
 
 ### 04b: hosting (waiting on accounts)
 - [x] TiDB Cloud Starter cluster created (Singapore, TiDB v8.5.3); `DATABASE_URL` uses TLS with certificate and hostname checks; migrations applied; all DB tests pass on TiDB
-- [x] Code pushed to the GitHub repository`n- [ ] Render service created from `render.yaml`
-- [ ] The public Render URL serves the prototype and `/api/health` reports the database as connected
+- [x] Code pushed to the GitHub repository`n- [x] Render service created from `render.yaml` (https://boche.onrender.com)
+- [x] The public Render URL serves the prototype and `/api/health` reports the database as connected

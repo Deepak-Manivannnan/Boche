@@ -5,3 +5,8 @@ The FastAPI backend serves the prototype's static files and the `/api` routes fr
 ## Considered Options
 
 - **Static site plus a separate API service with a rewrite rule**: workable, but two deployments and the same cookie pitfalls if the rewrite is misconfigured.
+
+## Consequences
+
+- Render's free plan has no pre-deploy step, so database migrations run in the start command before the server starts. Migrations must therefore stay safe to run on every start.
+- The prototype's service worker must never cache `/api` responses, because they share the origin with the cached app shell.
