@@ -1,5 +1,5 @@
-/* BocheClub service worker Ã¢â‚¬â€ caches the app shell so the card opens offline */
-var CACHE = 'bocheclub-v135';
+/* BocheClub service worker ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â caches the app shell so the card opens offline */
+var CACHE = 'bocheclub-v136';
 var SHELL = ['./', 'index.html', 'app.css', 'app.js', 'api.js', 'data.js', 'qr.js', 'manifest.json', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'img/portrait.webp', 'img/member.webp', 'img/shakesbierre.png'];
 self.addEventListener('install', function (e) { e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); })); self.skipWaiting(); });
 self.addEventListener('activate', function (e) {

@@ -274,13 +274,7 @@ var BC_DRAW = {
     { rank: '3rd prize', amount: 25000,  count: 1 },
     { rank: 'Lucky 7',   amount: 10000,  count: 7 }
   ],
-  letters: 'ABCDEFGHJKLMNPRSTUVWXYZ',
-  /* Prototype only: size of the simulated entry pool and names for simulated winners */
-  demoPool: 3200,
-  demoWins: 2,   /* prototype: the member's first 2 drawn days each give one of their numbers a Lucky 7 win */
-  demoNames: ['Anu S.', 'Bijoy K.', 'Deepa R.', 'Faisal M.', 'Gopika N.', 'Hari P.', 'Jincy T.', 'Kiran V.', 'Lakshmi A.', 'Manu J.',
-    'Nisha G.', 'Rahul C.', 'Reshma B.', 'Sajan P.', 'Shibu K.', 'Sneha M.', 'Thomas V.', 'Vineeth R.', 'Ashraf K.', 'Divya S.',
-    'Jose A.', 'Nikhil T.', 'Priya L.', 'Sreejith N.', 'Tessa J.', 'Vishnu P.', 'Ann M.', 'Biju R.', 'Fathima S.', 'Arjun D.']
+  letters: 'ABCDEFGHJKLMNPRSTUVWXYZ'
 };
 
 /* Customer support & grievances. Acknowledge within 48 hours and resolve within a month,

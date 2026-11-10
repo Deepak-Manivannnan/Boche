@@ -880,7 +880,9 @@
     if (!c.scratched) return { t: 'Not scratched yet', go: 'scratch/' + c.id, cta: 'Scratch' };
     if (!c.submitted) return { t: 'Not entered yet', go: 'scratch/' + c.id, cta: 'Enter' };
     var res = drawResults(c.drawDate);
-    if (!res) return { t: 'In ' + dayLabel(c.drawDate).toLowerCase() + '’s draw · ' + drawTimeLabel() };
+    if (!res) return { t: c.included === false ? 'Not in ' + dayLabel(c.drawDate).toLowerCase() + '’s sealed list'
+      : c.included ? 'In ' + dayLabel(c.drawDate).toLowerCase() + '’s sealed list · results 8:30 PM'
+      : 'In ' + dayLabel(c.drawDate).toLowerCase() + '’s draw · ' + drawTimeLabel() };
     var won = res.filter(function (w) { return c.nos.indexOf(w.no) > -1; });
     if (!won.length) return { t: dayLabel(c.drawDate) + '’s draw · no win this time' };
     var amt = won.reduce(function (t, w) { return t + w.amount; }, 0), wn = won.map(function (w) { return w.no; });
@@ -1217,44 +1219,27 @@
     if (key === dayShift(t, 1)) return 'Tomorrow';
     return new Date(key + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
   }
-  function drawState() {
-    S.draw = S.draw || { issued: {}, entries: {}, results: {} };
-    if (S.draw.demoV !== 2) { S.draw.results = {}; S.draw.demoWins = 0; S.draw.demoV = 2; }   /* re-run past draws once so the demo wins appear */
-    return S.draw;
-  }
   function drawTimeLabel() { var h = BC_DRAW.drawHour; return (h % 12 || 12) + (h < 12 ? ' AM' : ' PM'); }
-  function drawDone(key) { return key < dayKey() || (key === dayKey() && new Date().getHours() >= BC_DRAW.drawHour); }
-  function seeded(str) { var h = 2166136261; for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return function () { h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); h ^= h >>> 16; return (h >>> 0) / 4294967296; }; }
-  function luckyNo(rnd) { var L = BC_DRAW.letters; return L[Math.floor(rnd() * L.length)] + L[Math.floor(rnd() * L.length)] + ' ' + String(Math.floor(rnd() * 1e6) + 1e6).slice(1); }
   /* Lucky numbers are issued by the server after a confirmed payment (backend/app/ticketing.py) */
   function drawWinnerCount() { return BC_DRAW.prizes.reduce(function (t, p) { return t + p.count; }, 0); }
-  function maskMobile(m) { var d = m.replace(/\D/g, ''); return '••••• ' + d.slice(-5); }
-  /* Runs (once) and stores a day's draw: real entries plus the simulated pool */
-  function drawResults(key, force) {
-    var st = drawState();
-    if (st.results[key] && st.results[key].length === drawWinnerCount()) return st.results[key];
-    if (!drawDone(key) && !force) return null;
-    var real = st.entries[key] || [], total = real.length + BC_DRAW.demoPool, rnd = seeded('draw:' + key), picked = {}, out = [];
-    BC_DRAW.prizes.forEach(function (p) {
-      for (var c = 0; c < p.count; c++) {
-        var i; do { i = Math.floor(rnd() * total); } while (picked[i]); picked[i] = 1;
-        if (i < real.length) {
-          var m = memberOf(real[i].member);
-          out.push({ rank: p.rank, amount: p.amount, no: real[i].no, name: m.firstName + ' ' + m.name.split(' ').pop()[0] + '.', mob: maskMobile(m.mobile), member: m.id });
-        } else {
-          var r = seeded('who:' + key + ':' + i);
-          out.push({ rank: p.rank, amount: p.amount, no: luckyNo(r), name: BC_DRAW.demoNames[Math.floor(r() * BC_DRAW.demoNames.length)], mob: '••••• ' + String(Math.floor(r() * 1e5) + 1e5).slice(1) });
-        }
-      }
-    });
-    /* Prototype: give the member a Lucky 7 win on their first few drawn days so the claim flow can be seen */
-    if (real.length && (st.demoWins || 0) < BC_DRAW.demoWins && !out.some(function (w) { return w.no === real[0].no; })) {
-      var dm = memberOf(real[0].member), li = out.length - 1;
-      out[li] = { rank: out[li].rank, amount: out[li].amount, no: real[0].no, name: dm.firstName + ' ' + dm.name.split(' ').pop()[0] + '.', mob: maskMobile(dm.mobile), member: dm.id };
-      st.demoWins = (st.demoWins || 0) + 1;
-    }
-    st.results[key] = out; save();
-    return out;
+  /* Published results come from the server (/api/public/days): the ten Winners the draw engine picked from
+     the sealed list and drand. A day with no published result returns null. There is no simulated draw. */
+  var RESULTS = {}, resultsAt = 0;
+  function myNumbers() { var s = {}; allCards().forEach(function (x) { x.c.nos.forEach(function (n) { s[n] = 1; }); }); return s; }
+  function drawResults(key) {
+    var list = RESULTS[key]; if (!list) return null;
+    var mine = myNumbers();
+    return list.map(function (w) { return { rank: w.label, amount: w.amount, no: w.ticket, name: w.name, mob: w.mobile, member: mine[w.ticket] ? BC_MEMBER.id : null }; });
+  }
+  function refreshResults(force) {
+    if (!force && Date.now() - resultsAt < 15000) return Promise.resolve();
+    resultsAt = Date.now();
+    var before = JSON.stringify(RESULTS);
+    return BCAPI.get('/public/days').then(function (days) {
+      var next = {}; days.forEach(function (d) { if (d.winners) next[d.label] = d.winners; });
+      RESULTS = next;
+      if (JSON.stringify(RESULTS) !== before && ORDER_SCREENS[parse().name] && parse().name !== 'scratch') rerender();
+    }).catch(function () {});
   }
   /* Every tea pack bought = one scratch card; the card carries that pack's count of lucky numbers */
   function allCards() {
@@ -1262,16 +1247,13 @@
     teaOrders().forEach(function (o) { (o.cards || []).forEach(function (c) { out.push({ o: o, c: c }); }); });
     return out;
   }
-  /* Orders, cards, lucky numbers and entries come from the server (/api/me/orders). Until ticket 10
-     moves claims to the server, a claim is remembered on this device per card. */
+  /* Orders, cards, lucky numbers, entries, inclusion in the sealed list and claims all come from the server */
   var ORDERS = null, ordersAt = 0;
   var ORDER_SCREENS = { 'tea-orders': 1, 'tea-done': 1, 'my-numbers': 1, 'my-wins': 1, draw: 1, scratch: 1, claim: 1 };
   function teaOrders() { return ORDERS || []; }
-  function cardLocal() { return S.cardLocal = S.cardLocal || {}; }
-  function rememberCardLocal(c) { cardLocal()[c.id] = { claimed: c.claimed || null }; save(); }
   function fromServerOrder(o) {
     function r(p) { return p / 100; }
-    var d = o.delivery || {}, local = cardLocal();
+    var d = o.delivery || {};
     return {
       id: o.id, ts: o.ts, date: new Date(o.ts).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
       items: o.items.map(function (i) { return { size: i.size, qty: i.qty, price: r(i.unitPricePaise) }; }),
@@ -1279,8 +1261,7 @@
       tax: r(o.gstPaise), taxRate: o.teaGstRate, total: r(o.totalPaise),
       addr: { pin: d.pin, name: d.name, house: d.house, street: d.street }, area: { po: d.po, district: d.district },
       cards: o.cards.map(function (c) {
-        var l = local[c.id] || {};
-        return { id: c.id, pack: c.size, nos: c.numbers, scratched: c.scratched, submitted: !!c.entered, drawDate: c.drawDay || null, claimed: l.claimed || null };
+        return { id: c.id, pack: c.size, nos: c.numbers, scratched: c.scratched, submitted: !!c.entered, drawDate: c.drawDay || null, included: c.included, claimed: c.claim || null };
       })
     };
   }
@@ -1437,7 +1418,7 @@
   };
 
   SCREENS.draw = function () {
-    var st = drawState(), today = dayKey(), res = drawResults(today), mine = allCards().map(function (x) { return x.c; });
+    var today = dayKey(), res = drawResults(today), mine = allCards().map(function (x) { return x.c; });
     var pending = mine.filter(function (c) { return !c.submitted; });
     var nosFor = function (pred) { return mine.filter(pred).reduce(function (t, c) { return t.concat(c.nos); }, []); };
     var todayNos = nosFor(function (c) { return c.submitted && c.drawDate === today; });
@@ -1445,7 +1426,7 @@
     function winners(list) {
       return '<div class="list">' + list.map(function (w) {
         return '<div class="li win' + (w.member === BC_MEMBER.id ? ' me' : '') + '"><div class="li-main"><div class="li-t">' + esc(w.name) + (w.member === BC_MEMBER.id ? ' <span class="badge ok">You</span>' : '') + '</div>' +
-          '<div class="li-s">' + esc(w.rank) + ' · ' + esc(w.mob) + '</div></div><div class="win-r"><b>' + inr(w.amount) + '</b><span class="lno">' + esc(w.no) + '</span></div></div>';
+          '<div class="li-s">' + esc(w.rank) + (w.mob ? ' · ' + esc(w.mob) : '') + '</div></div><div class="win-r"><b>' + inr(w.amount) + '</b><span class="lno">' + esc(w.no) + '</span></div></div>';
       }).join('') + '</div>';
     }
     var DAYS = 30, sel = ui.drawSel && ui.drawSel <= today && ui.drawSel >= dayShift(today, -(DAYS - 1)) ? ui.drawSel : dayShift(today, -1);
@@ -1470,19 +1451,25 @@
       }).join('') : '') +
       '<div class="sec-h" style="padding:0;margin-top:22px"><h3>Today · ' + esc(new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })) + '</h3></div>' +
       (res ? winners(res)
-        : '<div class="surface draw-wait"><div class="dw-k">Draw in</div><div class="dw-v" id="drawCd"></div>' +
+        : '<div class="surface draw-wait"><div class="dw-k">Results in</div><div class="dw-v" id="drawCd"></div>' +
           '<div class="li-s">' + (todayNos.length ? 'Your ' + (todayNos.length > 1 ? todayNos.length + ' numbers' : 'number') + ' in today’s draw' : 'No entries from you yet. Order tea to get a scratch card.') + '</div>' +
           (todayNos.length ? '<div class="chips mt8">' + todayNos.map(function (no) { return '<span class="lno big">' + esc(no) + '</span>'; }).join('') + '</div>' : '') +
-          '<button class="btn-text" data-act="drawNow">Demo: run today’s draw now</button></div>') +
+          '</div>') +
       (nextNos.length ? '<p class="fine">Also entered for tomorrow: ' + nextNos.map(esc).join(', ') + '</p>' : '') +
       '<div class="sec-h" style="padding:0;margin-top:24px"><h3>Last 30 days</h3></div>' + calendar +
       '<p class="fine center mt16">Winners are contacted on their registered mobile. Prizes are subject to applicable taxes and the Lucky Draw terms.</p></div>';
   };
   AFTER.draw = function () {
+    refreshResults();
     var el = $('drawCd'); if (!el) return;
+    var at = new Date(dayKey() + 'T20:30:00+05:30'), polled = 0;   /* results are published at 8:30 PM IST */
     function tick() {
-      var now = new Date(), t = new Date(); t.setHours(BC_DRAW.drawHour, 0, 0, 0);
-      var ms = t - now; if (ms <= 0) { rerender(); return; }
+      var ms = at - new Date();
+      if (ms <= 0) {
+        el.textContent = 'Any moment';
+        if (Date.now() - polled > 20000) { polled = Date.now(); refreshResults(true); }
+        return;
+      }
       var h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60;
       el.textContent = (h ? h + 'h ' : '') + ('0' + m).slice(-2) + 'm ' + ('0' + s).slice(-2) + 's';
     }
@@ -2115,11 +2102,7 @@
       var shown = new Promise(function (res) { runSteps($('drawSteps').children, res, 550); });
       Promise.all([entry, shown]).then(function (r) {
         ui.sheetLock = false; closeSheet();
-        var key = r[0].drawDay, st = drawState();
-        /* Until ticket 10 the draw screen still shows the prototype's simulated winners; feed it this entry */
-        st.entries[key] = st.entries[key] || [];
-        c.nos.forEach(function (no) { st.entries[key].push({ no: no, member: BC_MEMBER.id, order: x.o.id, card: c.id, ts: Date.now() }); });
-        save();
+        var key = r[0].drawDay;
         c.submitted = true; c.drawDate = key; ui.justEntered = c.id; rerender(); ui.justEntered = null; playChime();
       }, function (e) {
         shown.then(function () {
@@ -2137,12 +2120,15 @@
       ui.sheetLock = true;
       openSheet('<h3>Submitting your claim</h3><ul class="steps" id="claimSteps">' +
         ['Sending your details', 'Verifying your lucky number', 'Claim received'].map(function (s) { return '<li><span class="st"></span>' + esc(s) + '</li>'; }).join('') + '</ul>');
-      runSteps($('claimSteps').children, function () {
-        ui.sheetLock = false; x.c.claimed = { ts: Date.now(), amount: q.amount, ref: 'CLM-' + Math.floor(100000 + Math.random() * 899999) };
-        rememberCardLocal(x.c); closeSheet(); rerender(); toast('Claim submitted');
-      }, 600);
+      var sent = BCAPI.post('/claims', { cardId: x.c.id });
+      var shown = new Promise(function (res) { runSteps($('claimSteps').children, res, 600); });
+      Promise.all([sent, shown]).then(function (r) {
+        ui.sheetLock = false; x.c.claimed = { ts: r[0].ts, amount: r[0].amount, ref: r[0].ref };
+        closeSheet(); rerender(); toast('Claim submitted');
+      }, function (e) {
+        shown.then(function () { ui.sheetLock = false; closeSheet(); toast(e.message || 'Could not submit the claim. Please try again.'); });
+      });
     },
-    drawNow: function () { drawResults(dayKey(), true); rerender(); },
     grvNew: function () { ui.grv = { biz: null, text: '', files: [], focusText: false }; go('grievance'); },
     grvBiz: function (el) { var first = !ui.grv.biz; ui.grv.biz = el.dataset.id; ui.grv.focusText = first; rerender(); },
     grvRemove: function (el) { ui.grv.files.splice(+el.dataset.id, 1); rerender(); },
@@ -2305,7 +2291,7 @@
     scr.scrollTop = keepScroll ? top : 0;
     renderTabs(TAB_OF[r.name] || r.name);
     if (AFTER[r.name]) AFTER[r.name](r.arg);
-    if (!keepScroll && ORDER_SCREENS[r.name]) refreshOrders();   /* pick up orders placed on another device */
+    if (!keepScroll && ORDER_SCREENS[r.name]) { refreshOrders(); refreshResults(); }   /* pick up orders placed on another device */
   }
   function rerender() { clearTimers(); render(true); }
 
@@ -2392,6 +2378,6 @@
     applyProfile(); saveSes();
     if (!SES.authed) { render(); return; }
     /* Signed in: load my orders before the first screen so cards and numbers are there straight away */
-    refreshOrders(true).then(render, render);
+    Promise.all([refreshOrders(true), refreshResults(true)]).then(render, render);
   });
 })();
