@@ -1,5 +1,6 @@
 """FastAPI application: the /api routes plus the prototype frontend on the same origin (ADR-0005)."""
 
+import logging
 import secrets
 from dataclasses import replace
 from pathlib import Path
@@ -9,10 +10,15 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import sessionmaker
+from starlette.concurrency import run_in_threadpool
 
 from app.auth import GoogleTokenVerifier, Sessions
 from app.clock import Clock, SystemClock
 from app.config import Settings
+from app.lifecycle import advance
+from app.seals import GitHubSealPublisher
+
+log = logging.getLogger("boche")
 
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
 
@@ -40,6 +46,27 @@ def create_app(
     app.state.clock = clock
     app.state.sessions = Sessions(settings.session_secret, settings.cookie_secure, clock)
     app.state.verify_google = verify_google or GoogleTokenVerifier(settings.google_client_id)
+    app.state.seal_publisher = (
+        GitHubSealPublisher(settings.seals_repo, settings.seals_token)
+        if settings.seals_repo and settings.seals_token
+        else None
+    )
+    app.state.last_advance = None
+
+    @app.middleware("http")
+    async def apply_due_steps(request: Request, call_next):
+        """Before any API request, apply Draw day steps that are due (at most every 15 s; /api/tick runs
+        them itself). This is what closes Entries at 8 PM even if no scheduler fired."""
+        path = request.url.path
+        if path.startswith("/api/") and path not in ("/api/tick", "/api/health"):
+            now, last = app.state.clock.now(), app.state.last_advance
+            if last is None or not 0 <= (now - last).total_seconds() < 15:
+                app.state.last_advance = now
+                try:
+                    await run_in_threadpool(advance, app.state.sessionmaker, now, app.state.seal_publisher)
+                except Exception:  # a failed step must never break the request; it is retried next time
+                    log.exception("applying due Draw day steps failed")
+        return await call_next(request)
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
@@ -67,10 +94,12 @@ def create_app(
     from app.routes_auth import router as auth_router
     from app.routes_entries import router as entries_router
     from app.routes_orders import router as orders_router
+    from app.routes_public import router as public_router
 
     app.include_router(auth_router)
     app.include_router(orders_router)
     app.include_router(entries_router)
+    app.include_router(public_router)
 
     # Mounted last so every /api route above takes precedence over static files.
     app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

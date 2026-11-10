@@ -35,6 +35,8 @@ class Settings:
     admin_emails: frozenset[str]  # lower-case emails allowed to act as Admin
     cookie_secure: bool  # True behind HTTPS (Render), False on http://localhost
     payment_secret: str = ""  # shared with the (mock) payment provider to sign confirmations
+    seals_repo: str = ""  # owner/repo of the public GitHub seals repository
+    seals_token: str = ""  # fine-grained token: Contents read/write on that one repository only
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -48,6 +50,8 @@ class Settings:
             ),
             cookie_secure=os.environ.get("COOKIE_SECURE", "false").strip().lower() == "true",
             payment_secret=_secret("PAYMENT_WEBHOOK_SECRET"),
+            seals_repo=os.environ.get("SEALS_REPO", "").strip(),
+            seals_token=os.environ.get("SEALS_GITHUB_TOKEN", "").strip(),
         )
 
 

@@ -12,4 +12,5 @@ The draw's randomness comes from one round of drand's quicknet beacon, run by th
 ## Consequences
 
 - If drand is unavailable when the Draw run is attempted, the run waits; the Randomness round named in the Seal is never changed.
+- If the server seals late (for example, it was asleep at 8 PM and wakes at 8:20), the 8:15 PM round is already public. The Seal then names a round at least 30 seconds in the future instead, and the draw waits for it, so the Ticket list is always fixed before its randomness exists.
 - The Verifier fetches the round directly from drand relays, not from Boche.
