@@ -1,0 +1,17 @@
+# Render Blueprint: one free web service serving the frontend and /api on one origin (ADR-0005).
+# Secrets are set in the Render dashboard (sync: false), never committed.
+services:
+  - type: web
+    name: boche
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: pip install -r backend/requirements.txt
+    # Free instances have no pre-deploy hook, so migrations run at start. They are idempotent.
+    startCommand: python -m alembic -c backend/alembic.ini upgrade head && uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: DATABASE_URL
+        sync: false
