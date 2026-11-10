@@ -1,0 +1,14 @@
+{
+  "description": "Known-answer vector for boche-draw-v1. Derived independently from the spec text, then checked against the engine. The engine and the Verifier must both reproduce it exactly.",
+  "draw_day": "2026-11-10",
+  "randomness": "000000000000000000000000000000000000000000000000000000000000002a",
+  "tickets": ["GH 000004", "AB 000001", "JK 000005", "EF 000003", "CD 000002", "LM 000006",
+              "NP 000007", "RS 000008", "TU 000009", "VW 000010", "XY 000011", "ZA 000012"],
+  "fingerprint": "d6a3c97148ac8ab984b620476bd3896c9658bdd651cddee27943b7eea4a62726",
+  "seed": "362cf16fe50f11e551586551731a6414b8d13d38c402924eda7512afccc31838",
+  "winners": [
+    [1, 6, "LM 000006"], [2, 11, "XY 000011"], [3, 12, "ZA 000012"], [4, 3, "EF 000003"],
+    [5, 8, "RS 000008"], [6, 7, "NP 000007"], [7, 1, "AB 000001"], [8, 10, "VW 000010"],
+    [9, 9, "TU 000009"], [10, 4, "GH 000004"]
+  ]
+}

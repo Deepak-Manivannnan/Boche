@@ -4,11 +4,11 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Canonical Ticket list: sorted, fixed header, `\n` endings, UTF-8; Fingerprint is SHA-256 of it
-- [ ] Seed derived from Randomness round value, Fingerprint and Draw day
-- [ ] Rejection sampling gives unbiased indices; ten distinct Winners; ranks 1–3 Main, 4–10 Consolation
-- [ ] Fewer than ten Tickets raises a clear error
-- [ ] Tests: same inputs give the same output; a fixed known-answer vector; one changed Ticket changes the Fingerprint; chi-square uniformity; 3 Tickets win about 3× as often as 1; 100,000 Tickets in under 2 s
-- [ ] A command-line demo prints the Winners and the time taken for a generated 100,000-Ticket list
+- [x] Canonical Ticket list: sorted, fixed header, `\n` endings, UTF-8; Fingerprint is SHA-256 of it
+- [x] Seed derived from Randomness round value, Fingerprint and Draw day
+- [x] Rejection sampling gives unbiased indices; ten distinct Winners; ranks 1–3 Main, 4–10 Consolation
+- [x] Fewer than ten Tickets raises a clear error
+- [x] Tests: same inputs give the same output; a fixed known-answer vector; one changed Ticket changes the Fingerprint; chi-square uniformity; 3 Tickets win about 3× as often as 1; 100,000 Tickets in under 2 s
+- [x] A command-line demo prints the Winners and the time taken for a generated 100,000-Ticket list

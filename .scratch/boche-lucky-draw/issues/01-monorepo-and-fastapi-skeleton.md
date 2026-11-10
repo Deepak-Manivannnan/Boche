@@ -4,11 +4,11 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The prototype is moved into the frontend folder in a commit containing only the move
-- [ ] The backend starts with one command and serves the prototype at `/`
-- [ ] A health endpoint under `/api` returns ok
-- [ ] Backend, engine and Verifier folders exist, with the Python toolchain (pytest, ruff) configured
-- [ ] Tests: health endpoint responds; the index page is served
-- [ ] Every prototype screen still works unchanged in the browser
+- [x] The prototype is moved into the frontend folder in a commit containing only the move
+- [x] The backend starts with one command and serves the prototype at `/`
+- [x] A health endpoint under `/api` returns ok
+- [x] Backend, engine and Verifier folders exist, with the Python toolchain (pytest, ruff) configured
+- [x] Tests: health endpoint responds; the index page is served
+- [x] Every prototype screen still works unchanged in the browser
