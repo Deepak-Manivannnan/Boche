@@ -1,21 +1,56 @@
 """FastAPI application: the /api routes plus the prototype frontend on the same origin (ADR-0005)."""
 
+from dataclasses import replace
 from pathlib import Path
 
 import sqlalchemy as sa
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.orm import sessionmaker
 
-from app.config import database_url as configured_database_url
+from app.auth import GoogleTokenVerifier, Sessions
+from app.clock import Clock, SystemClock
+from app.config import Settings
 
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
 
 
-def create_app(database_url: str | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    *,
+    database_url: str | None = None,
+    verify_google=None,
+    clock: Clock | None = None,
+) -> FastAPI:
+    if settings is None:
+        settings = Settings.from_env() if database_url is None else _minimal_settings(database_url)
+    elif database_url is not None:
+        settings = replace(settings, database_url=database_url)
+    clock = clock or SystemClock()
+
     app = FastAPI(title="Boche Lucky Draw")
-    db = sa.create_engine(database_url or configured_database_url(), pool_pre_ping=True, pool_recycle=280)
+    db = sa.create_engine(settings.database_url, pool_pre_ping=True, pool_recycle=280)
+    app.state.settings = settings
     app.state.db = db
+    app.state.sessionmaker = sessionmaker(db, expire_on_commit=False)
+    app.state.clock = clock
+    app.state.sessions = Sessions(settings.session_secret, settings.cookie_secure, clock)
+    app.state.verify_google = verify_google or GoogleTokenVerifier(settings.google_client_id)
+
+    @app.middleware("http")
+    async def security_headers(request: Request, call_next):
+        response = await call_next(request)
+        # Google Identity Services needs the page origin as referrer; on plain-http localhost Google
+        # asks for no-referrer-when-downgrade.
+        https = request.url.scheme == "https"
+        response.headers["Referrer-Policy"] = (
+            "strict-origin-when-cross-origin" if https else "no-referrer-when-downgrade"
+        )
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store"
+        return response
 
     @app.get("/api/health")
     def health():
@@ -26,9 +61,23 @@ def create_app(database_url: str | None = None) -> FastAPI:
             return JSONResponse({"status": "degraded", "database": "unreachable"}, status_code=503)
         return {"status": "ok", "database": "connected"}
 
+    from app.routes_auth import router as auth_router
+
+    app.include_router(auth_router)
+
     # Mounted last so every /api route above takes precedence over static files.
     app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
     return app
+
+
+def _minimal_settings(database_url: str) -> Settings:
+    return Settings(
+        database_url=database_url,
+        google_client_id="",
+        session_secret="x" * 32,
+        admin_emails=frozenset(),
+        cookie_secure=False,
+    )
 
 
 def __getattr__(name: str):

@@ -48,10 +48,13 @@
   };
   /* Name, email and mobile the member gave at onboarding override the seed profile */
   var BASE = { name: BC_MEMBER.name, firstName: BC_MEMBER.firstName, email: BC_MEMBER.email, mobile: BC_MEMBER.mobile };
+  /* The signed-in Google account (from /api/me); when present it is the member's real name and email */
+  var ME = null, BOOT = { googleClientId: '' };
   function applyProfile() {
     var p = S.members[BC_MEMBER.id].profile;
     BC_MEMBER.name = p ? p.name : BASE.name; BC_MEMBER.firstName = p ? p.name.split(' ')[0] : BASE.firstName;
     BC_MEMBER.email = p ? p.email : BASE.email; BC_MEMBER.mobile = p && p.mobile ? p.mobile : BASE.mobile;
+    if (ME) { BC_MEMBER.name = ME.name; BC_MEMBER.firstName = ME.firstName; BC_MEMBER.email = ME.email; if (ME.mobile) BC_MEMBER.mobile = ME.mobile; }
   }
   applyProfile();
   function teaBlankBag() { var q = {}; BC_TEA.packs.forEach(function (p) { q[p.id] = 0; }); return q; }
@@ -262,10 +265,9 @@
       '<p class="wl-tag">One card. Every Boche experience.</p>' +
       '<div class="wl-perks"><span>' + ic('sparkle', 13) + 'Rewards</span><span>' + ic('gift', 13) + 'Offers</span><span>' + ic('users', 13) + 'Events</span></div></div>' +
       '<div class="wl-sheet"><h1>Welcome</h1>' +
-      '<p class="wl-sub">Sign in or join with your mobile number</p>' +
-      '<div class="phone-field"><span class="cc">+91</span><input id="mobile" type="tel" inputmode="numeric" maxlength="10" placeholder="Mobile number" aria-label="Mobile number" autocomplete="tel-national" value="' + esc(ui.mobile) + '"></div>' +
-      '<div class="err-text" id="mobErr"></div>' +
-      '<button class="btn btn-gold" id="sendOtp" data-act="sendOtp" disabled>Continue ' + ic('chev', 18) + '</button>' +
+      '<p class="wl-sub">Sign in or join with your Google account</p>' +
+      '<div class="gsi-slot" id="gsiBtn"><span class="mini-spin" aria-label="Loading Google sign-in"></span></div>' +
+      '<div class="err-text" id="mobErr">' + esc(ui.signInErr || '') + '</div>' +
       '<p class="wl-legal">Free to join</p></div></div>';
   };
   SCREENS.login = SCREENS.welcome;
@@ -281,7 +283,38 @@
     inp.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !btn.disabled) onEnter(); });
     check(); if (!noFocus) inp.focus();
   }
-  AFTER.welcome = AFTER.login = function () { wireMobile('mobile', 'sendOtp', 'mobErr', function () { ACTIONS.sendOtp(); }, true); };
+  /* Sign in with Google (Google Identity Services). The button is Google's own, as its branding rules
+     require; the server checks the ID token and sets an httpOnly session cookie. */
+  AFTER.welcome = AFTER.login = function () {
+    var tries = 0;
+    function ready() {
+      var slot = $('gsiBtn');
+      if (!slot) return true;
+      var gid = window.google && window.google.accounts && window.google.accounts.id;
+      if (!gid || !BOOT.googleClientId) return false;
+      gid.initialize({ client_id: BOOT.googleClientId, callback: onGoogleCredential, ux_mode: 'popup', auto_select: false, cancel_on_tap_outside: true });
+      slot.innerHTML = '';
+      gid.renderButton(slot, { type: 'standard', theme: 'outline', size: 'large', shape: 'pill', text: 'continue_with', logo_alignment: 'center', width: Math.min(400, slot.clientWidth || 320) });
+      return true;
+    }
+    if (ready()) return;
+    var t = setInterval(function () {
+      if (ready()) { clearInterval(t); return; }
+      if (++tries > 80) { clearInterval(t); var e = $('mobErr'); if (e) e.textContent = BOOT.googleClientId ? 'Google sign-in could not load. Check your connection and reload.' : 'Sign-in is not available right now. Please try again later.'; }
+    }, 100);
+    timers.push(t);
+  };
+  function onGoogleCredential(resp) {
+    var slot = $('gsiBtn'); if (slot) slot.innerHTML = '<span class="mini-spin" aria-label="Signing in"></span>';
+    ui.signInErr = '';
+    BCAPI.post('/auth/google', { credential: resp.credential }).then(function (u) {
+      ME = u; applyProfile(); SES.authed = true; SES.pending = null; saveSes();
+      go('home'); toast('Welcome, ' + BC_MEMBER.firstName);
+    }).catch(function (e) {
+      ui.signInErr = e.status === 503 ? 'Google sign-in is unavailable right now. Please try again.' : 'Sign-in failed. Please try again.';
+      rerender();
+    });
+  }
 
   function wireOtp(onFull) {
     var wrap = $('otp'), ins = wrap.querySelectorAll('input'), btn = wrap.parentNode.querySelector('[data-otp-btn]');
@@ -2060,7 +2093,11 @@
       S = freshShared(); save(); SES = { authed: false, pending: null, staffId: null, outlet: null }; saveSes();
       ui.mobile = ''; ui.staffMobile = ''; kycReset(); ui.billAmt = ''; resetBook(); applyProfile(); toast('Demo reset'); go('welcome');
     },
-    logout: function () { SES.authed = false; SES.pending = null; saveSes(); go('welcome'); },
+    logout: function () {
+      BCAPI.post('/auth/logout').catch(function () {});
+      try { window.google.accounts.id.disableAutoSelect(); } catch (e) {}
+      ME = null; applyProfile(); SES.authed = false; SES.pending = null; saveSes(); go('welcome');
+    },
     closeSheet: function () { closeSheet(); },
     wxClose: function () { var w = $('wx'); if (!w) return; w.classList.add('out'); setTimeout(function () { w.remove(); rerender(); }, 350); },
     demoOtp: function () {
@@ -2083,7 +2120,8 @@
   /* ============================================================
      SHELL: router, sheet, toast, tabs
      ============================================================ */
-  var MEMBER_PUBLIC = { welcome: 1, login: 1, otp: 1 };
+  /* Google sign-in replaced the mobile OTP, SIM and new-phone steps, so the old OTP screen is no longer a way in */
+  var MEMBER_PUBLIC = { welcome: 1, login: 1 };
   var STAFF_PUBLIC = { staff: 1, 'staff-otp': 1 };
   var STAFF_APP = { scan: 1, verify: 1 };
   var TABS = { home: 1, explore: 1, card: 1, activity: 1, profile: 1, tea: 1, 'tea-orders': 1, 'my-numbers': 1, 'my-wins': 1, draw: 1, scratch: 1, 'tea-done': 1 };
@@ -2199,5 +2237,16 @@
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
   }
 
-  render();
+  /* Boot: the server decides who is signed in. 401 means signed out; a network error (offline) keeps the
+     last known state so the cached app shell still opens. */
+  Promise.all([
+    BCAPI.get('/config').catch(function () { return {}; }),
+    BCAPI.get('/me').catch(function (e) { return e.status === 401 ? null : undefined; })
+  ]).then(function (r) {
+    BOOT.googleClientId = (r[0] && r[0].googleClientId) || '';
+    if (r[1]) { ME = r[1]; SES.authed = true; SES.pending = null; }
+    else if (r[1] === null) { ME = null; SES.authed = false; SES.pending = null; }
+    applyProfile(); saveSes();
+    render();
+  });
 })();

@@ -34,6 +34,22 @@ def db_engine(migrated_url):
     engine.dispose()
 
 
+def _delete_all_rows(engine) -> None:
+    from app.models import Base
+
+    with engine.begin() as conn:
+        for table in reversed(Base.metadata.sorted_tables):
+            conn.execute(table.delete())
+
+
+@pytest.fixture
+def clean_db(db_engine):
+    """For tests that go through the API (which commits): start and finish with empty tables."""
+    _delete_all_rows(db_engine)
+    yield
+    _delete_all_rows(db_engine)
+
+
 @pytest.fixture
 def session(db_engine):
     """A session inside a transaction that is always rolled back, so tests never leak rows."""

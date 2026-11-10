@@ -1518,3 +1518,7 @@ a.hm-cta, .hm-cta { min-height: 30px; }
 .wn-row.ot-h { font-size: 9.5px; letter-spacing: .04em; }
 .wn-row > span:nth-child(5) { text-align: right; }
 .wn-row.ot-h > span:nth-child(6) { padding-left: 4px; }
+
+/* Sign in with Google: Google draws its own button inside this slot (its branding rules); the slot keeps the welcome sheet's spacing */
+.gsi-slot { display: flex; justify-content: center; align-items: center; min-height: 44px; margin: 4px 0 2px; }
+.gsi-slot > div { width: 100%; display: flex; justify-content: center; }

@@ -21,7 +21,13 @@ Needs Python 3.11+, a MySQL 8 server and Node (only for one frontend test).
    ```
    DATABASE_URL=mysql+pymysql://boche:<password>@127.0.0.1:3306/boche
    TEST_DATABASE_URL=mysql+pymysql://boche:<password>@127.0.0.1:3306/boche_test
+   GOOGLE_CLIENT_ID=<your OAuth web client id>.apps.googleusercontent.com
+   ADMIN_EMAILS=you@gmail.com
+   SESSION_SECRET=<any random string of 32+ characters>
+   COOKIE_SECURE=false
    ```
+
+   The Google client must list `http://localhost` and `http://localhost:8000` as authorised JavaScript origins. Open the app at `http://localhost:8000`, not `127.0.0.1`.
 
 3. Install, migrate and run:
 

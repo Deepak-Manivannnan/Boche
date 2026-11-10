@@ -1,6 +1,6 @@
 /* BocheClub service worker — caches the app shell so the card opens offline */
-var CACHE = 'bocheclub-v131';
-var SHELL = ['./', 'index.html', 'app.css', 'app.js', 'data.js', 'qr.js', 'manifest.json', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'img/portrait.webp', 'img/member.webp', 'img/shakesbierre.png'];
+var CACHE = 'bocheclub-v132';
+var SHELL = ['./', 'index.html', 'app.css', 'app.js', 'api.js', 'data.js', 'qr.js', 'manifest.json', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'img/portrait.webp', 'img/member.webp', 'img/shakesbierre.png'];
 self.addEventListener('install', function (e) { e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); })); self.skipWaiting(); });
 self.addEventListener('activate', function (e) {
   e.waitUntil(caches.keys().then(function (k) { return Promise.all(k.filter(function (x) { return x !== CACHE; }).map(function (x) { return caches.delete(x); })); }));
