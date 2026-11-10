@@ -65,10 +65,12 @@ def create_app(
         return {"status": "ok", "database": "connected"}
 
     from app.routes_auth import router as auth_router
+    from app.routes_entries import router as entries_router
     from app.routes_orders import router as orders_router
 
     app.include_router(auth_router)
     app.include_router(orders_router)
+    app.include_router(entries_router)
 
     # Mounted last so every /api route above takes precedence over static files.
     app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

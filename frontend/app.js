@@ -1260,13 +1260,13 @@
     teaOrders().forEach(function (o) { (o.cards || []).forEach(function (c) { out.push({ o: o, c: c }); }); });
     return out;
   }
-  /* Orders, cards and lucky numbers come from the server (/api/me/orders). Until tickets 07 and 10 move
-     entering and claiming to the server, those two flags are remembered on this device per card. */
+  /* Orders, cards, lucky numbers and entries come from the server (/api/me/orders). Until ticket 10
+     moves claims to the server, a claim is remembered on this device per card. */
   var ORDERS = null, ordersAt = 0;
   var ORDER_SCREENS = { 'tea-orders': 1, 'tea-done': 1, 'my-numbers': 1, 'my-wins': 1, draw: 1, scratch: 1, claim: 1 };
   function teaOrders() { return ORDERS || []; }
   function cardLocal() { return S.cardLocal = S.cardLocal || {}; }
-  function rememberCardLocal(c) { cardLocal()[c.id] = { submitted: c.submitted, drawDate: c.drawDate, claimed: c.claimed || null }; save(); }
+  function rememberCardLocal(c) { cardLocal()[c.id] = { claimed: c.claimed || null }; save(); }
   function fromServerOrder(o) {
     function r(p) { return p / 100; }
     var d = o.delivery || {}, local = cardLocal();
@@ -1278,7 +1278,7 @@
       addr: { pin: d.pin, name: d.name, house: d.house, street: d.street }, area: { po: d.po, district: d.district },
       cards: o.cards.map(function (c) {
         var l = local[c.id] || {};
-        return { id: c.id, pack: c.size, nos: c.numbers, scratched: c.scratched, submitted: !!l.submitted, drawDate: l.drawDate || null, claimed: l.claimed || null };
+        return { id: c.id, pack: c.size, nos: c.numbers, scratched: c.scratched, submitted: !!c.entered, drawDate: c.drawDay || null, claimed: l.claimed || null };
       })
     };
   }
@@ -2012,13 +2012,24 @@
       ui.sheetLock = true;
       openSheet('<h3>Entering the Lucky Draw</h3><p class="lead">' + numsLabel(c.nos.length) + '</p><ul class="steps" id="drawSteps">' +
         ['Sending ' + (c.nos.length > 1 ? 'your numbers' : 'your number') + ' to Boche', 'Checking it’s valid and unused', 'Entry confirmed'].map(function (s) { return '<li><span class="st"></span>' + esc(s) + '</li>'; }).join('') + '</ul>');
-      runSteps($('drawSteps').children, function () {
+      /* The server decides the Draw day by its own IST clock (before 8 PM: today; after: tomorrow) */
+      var entry = BCAPI.post('/draw/entries', { cardId: c.id });
+      var shown = new Promise(function (res) { runSteps($('drawSteps').children, res, 550); });
+      Promise.all([entry, shown]).then(function (r) {
         ui.sheetLock = false; closeSheet();
-        var key = nextDrawKey(), st = drawState();
+        var key = r[0].drawDay, st = drawState();
+        /* Until ticket 10 the draw screen still shows the prototype's simulated winners; feed it this entry */
         st.entries[key] = st.entries[key] || [];
         c.nos.forEach(function (no) { st.entries[key].push({ no: no, member: BC_MEMBER.id, order: x.o.id, card: c.id, ts: Date.now() }); });
-        c.submitted = true; c.drawDate = key; rememberCardLocal(c); ui.justEntered = c.id; rerender(); ui.justEntered = null; playChime();
-      }, 550);
+        save();
+        c.submitted = true; c.drawDate = key; ui.justEntered = c.id; rerender(); ui.justEntered = null; playChime();
+      }, function (e) {
+        shown.then(function () {
+          ui.sheetLock = false; closeSheet();
+          toast(e.status === 409 ? (e.message || 'This card can’t be entered') : e.status === 401 ? 'Please sign in again' : 'Could not enter the draw. Please try again.');
+          refreshOrders(true);
+        });
+      });
     },
     /* Claim a Lucky Draw win: confirm payout account → paid (prototype: nothing is really sent) */
     claimPrize: function (el) { go('claim/' + el.dataset.id); },

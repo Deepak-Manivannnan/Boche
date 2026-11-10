@@ -55,7 +55,11 @@ def _my_order(db: Session, user: m.User, order_id: str) -> m.Order:
     order = db.scalar(
         sa.select(m.Order)
         .where(m.Order.public_id == order_id, m.Order.user_id == user.id)
-        .options(selectinload(m.Order.items), selectinload(m.Order.cards).selectinload(m.Card.tickets))
+        .options(
+            selectinload(m.Order.items),
+            selectinload(m.Order.cards).selectinload(m.Card.tickets),
+            selectinload(m.Order.cards).selectinload(m.Card.draw_day),
+        )
     )
     if order is None:
         raise HTTPException(status_code=404, detail="No such order")
@@ -96,6 +100,8 @@ def order_json(order: m.Order) -> dict:
                 "size": PACKS[c.pack_id].size,
                 "numbers": [t.number for t in sorted(c.tickets, key=lambda t: t.id)],
                 "scratched": c.scratched_at is not None,
+                "entered": c.entered_at is not None,
+                "drawDay": c.draw_day.label if c.draw_day else None,
             }
             for c in sorted(order.cards, key=lambda c: c.id)
         ],
@@ -166,7 +172,11 @@ def my_orders(request: Request, db: Db) -> list[dict]:
         sa.select(m.Order)
         .where(m.Order.user_id == user.id, m.Order.status != "pending")
         .order_by(m.Order.paid_at.desc(), m.Order.id.desc())
-        .options(selectinload(m.Order.items), selectinload(m.Order.cards).selectinload(m.Card.tickets))
+        .options(
+            selectinload(m.Order.items),
+            selectinload(m.Order.cards).selectinload(m.Card.tickets),
+            selectinload(m.Order.cards).selectinload(m.Card.draw_day),
+        )
     ).all()
     return [order_json(o) for o in orders]
 

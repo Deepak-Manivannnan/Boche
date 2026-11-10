@@ -27,9 +27,13 @@ def run_adapter(server_order: dict, card_local: dict) -> dict:
 
 
 def test_server_orders_become_the_prototypes_order_shape(make_client):
-    paid = buy(make_client(), {"p1k": 1, "p250": 2})
+    client = make_client()
+    paid = buy(client, {"p1k": 1, "p250": 2})
     first_card = paid["cards"][0]["id"]
-    o = run_adapter(paid, {first_card: {"submitted": True, "drawDate": "2026-11-10"}})
+    client.post("/api/draw/entries", json={"cardId": first_card})
+    server_order = client.get("/api/me/orders").json()[0]
+    claim = {"ts": 1, "amount": 10000, "ref": "CLM-1"}
+    o = run_adapter(server_order, {first_card: {"claimed": claim}})
 
     assert o["id"] == paid["id"]
     assert re.fullmatch(r"\d{2} \w{3,4} \d{4}", o["date"])
@@ -41,5 +45,6 @@ def test_server_orders_become_the_prototypes_order_shape(make_client):
     assert o["area"] == {"po": DELIVERY["po"], "district": DELIVERY["district"]}
     assert [c["pack"] for c in o["cards"]] == ["250 g", "250 g", "1 kg"]
     assert [len(c["nos"]) for c in o["cards"]] == [1, 1, 8]
-    assert o["cards"][0]["submitted"] is True and o["cards"][0]["drawDate"] == "2026-11-10"
+    assert o["cards"][0]["submitted"] is True and o["cards"][0]["drawDate"] == "2026-11-10"  # from the server
+    assert o["cards"][0]["claimed"] == claim  # still per device until ticket 10
     assert o["cards"][1]["submitted"] is False and o["cards"][1]["drawDate"] is None

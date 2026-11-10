@@ -231,7 +231,7 @@ var BC_STAFF_UI = {
    go = route for live businesses; coming-soon businesses show a teaser. */
 var BC_PROMO_CFG = { rotateMs: 5000 };
 var BC_PROMOS = [
-  { biz: 'club',   title: 'Win ₹1 lakh every day', art: 'draw', text: 'Every Tea order gets a scratch card for the daily 9 PM Lucky Draw.', cta: 'Lucky Draw', go: 'draw', icon: 'gift' },
+  { biz: 'club',   title: 'Win ₹1 lakh every day', art: 'draw', text: 'Every Tea order gets a scratch card for the daily 8 PM Lucky Draw.', cta: 'Lucky Draw', go: 'draw', icon: 'gift' },
   { biz: 'pub',    title: 'Pub Trail', art: 'pub', logo: 'img/shakesbierre.png',            text: 'Visit 3 Boche pubs this month and earn 1,500 bonus points.', cta: 'Explore pubs', go: 'biz/pub' },
   { biz: 'resort', title: 'Weekend at 1000 Acre', art: 'resort', text: 'Stay two nights and earn 1,000 bonus points.',                cta: 'View resort',  go: 'biz/resort' },
   { biz: 'club',   title: 'Bring a friend', art: 'friend',       text: 'Earn 500 points when a friend joins and makes a first visit.', cta: 'See offers',   go: 'offers' },
@@ -267,7 +267,7 @@ var BC_TEA = {
    draw, later ones into the next day's. In production the server issues numbers and runs the draw. */
 var BC_DRAW = {
   name: 'Lucky Draw',
-  drawHour: 21,
+  drawHour: 20,   /* entries close 8:00 PM IST, draw 8:15, results 8:30; the server enforces these */
   prizes: [
     { rank: '1st prize', amount: 100000, count: 1 },
     { rank: '2nd prize', amount: 50000,  count: 1 },
