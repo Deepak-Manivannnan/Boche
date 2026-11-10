@@ -58,7 +58,8 @@ def main() -> int:
         with sessions() as db:
             day = close_test_day(db, label, clock.now(), timedelta(0))
             print(
-                f"Closed: {day.ticket_count:,} tickets, fingerprint {day.fingerprint}, drand round {day.drand_round}"
+                f"Closed: {day.ticket_count:,} tickets, fingerprint {day.fingerprint}, "
+                f"drand round {day.drand_round}"
             )
     return 0
 
