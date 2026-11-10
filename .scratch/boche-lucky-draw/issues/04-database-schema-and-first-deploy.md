@@ -15,6 +15,6 @@
 - [x] Tests: migrations apply, roll back and reapply; migrations match the models exactly; unique constraints reject duplicates
 
 ### 04b: hosting (waiting on accounts)
-- [ ] TiDB Cloud Starter cluster created; `DATABASE_URL` uses TLS
-- [ ] Code pushed to the GitHub repository; Render service created from `render.yaml`
+- [x] TiDB Cloud Starter cluster created (Singapore, TiDB v8.5.3); `DATABASE_URL` uses TLS with certificate and hostname checks; migrations applied; all DB tests pass on TiDB
+- [x] Code pushed to the GitHub repository`n- [ ] Render service created from `render.yaml`
 - [ ] The public Render URL serves the prototype and `/api/health` reports the database as connected
