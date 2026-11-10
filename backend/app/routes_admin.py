@@ -13,6 +13,7 @@ from app import models as m
 from app.deps import get_db, require_admin
 from app.drand import round_released_at
 from app.drawrun import DrawRefused, run_draw
+from app.lifecycle import publish_results
 from app.otp import OtpRefused, active_expiry, request_otp
 
 router = APIRouter(prefix="/api/admin")
@@ -106,6 +107,8 @@ def enter_otp_and_run(label: Label, body: OtpEntry, request: Request, db: Db) ->
     state = request.app.state
     try:
         day = run_draw(db, label, admin, body.code, state.clock.now(), state.drand_fetch)
+        publish_results(db, state.clock.now())  # a draw after 8:30 PM is published straight away
+        db.refresh(day)
     except DrawRefused as e:
         raise HTTPException(status_code=e.status, detail=e.detail) from e
     return day_json(db, day, state.clock.now())

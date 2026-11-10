@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, StrictInt, field_validator
 from sqlalchemy.orm import Session, selectinload
 
 from app import models as m
-from app.catalog import LOGISTICS_GST_RATE, MAX_QTY, PACKS, TEA_GST_RATE, quote
+from app.catalog import LOGISTICS_GST_RATE, MAX_QTY, PACKS, TEA_GST_RATE, prize, quote
 from app.deps import current_user, get_db
 from app.payments import SIGNATURE_HEADER, MockPaymentProvider, PaymentRejected, confirm_payment
 
@@ -58,7 +58,7 @@ def _my_order(db: Session, user: m.User, order_id: str) -> m.Order:
         .options(
             selectinload(m.Order.items),
             selectinload(m.Order.cards).selectinload(m.Card.tickets),
-            selectinload(m.Order.cards).selectinload(m.Card.draw_day),
+            selectinload(m.Order.cards).selectinload(m.Card.draw_day).selectinload(m.DrawDay.result),
         )
     )
     if order is None:
@@ -66,7 +66,7 @@ def _my_order(db: Session, user: m.User, order_id: str) -> m.Order:
     return order
 
 
-def order_json(order: m.Order) -> dict:
+def order_json(order: m.Order, claims: dict[int, m.Claim] | None = None) -> dict:
     when = order.paid_at or order.created_at
     return {
         "id": order.public_id,
@@ -102,10 +102,40 @@ def order_json(order: m.Order) -> dict:
                 "scratched": c.scratched_at is not None,
                 "entered": c.entered_at is not None,
                 "drawDay": c.draw_day.label if c.draw_day else None,
+                **card_result(c, claims or {}),
             }
             for c in sorted(order.cards, key=lambda c: c.id)
         ],
     }
+
+
+def card_result(card: m.Card, claims: dict[int, m.Claim]) -> dict:
+    """Per card: was it in its Draw day's sealed list, which of its Tickets won (only once published),
+    and the Claim, if any."""
+    day = card.draw_day
+    included = None
+    if day is not None and day.sealed_at is not None:
+        included = any(
+            t.draw_day_id == day.id and (t.cancelled_at is None or t.cancelled_at > day.sealed_at)
+            for t in card.tickets
+        )
+    wins = []
+    if day is not None and day.status == "published" and day.result is not None:
+        ranks = {w["ticket"]: w["rank"] for w in day.result.winners}
+        for t in card.tickets:
+            if t.number in ranks:
+                label, amount = prize(ranks[t.number])
+                wins.append({"ticket": t.number, "rank": ranks[t.number], "label": label, "amount": amount})
+        wins.sort(key=lambda w: w["rank"])
+    mine = sorted((claims[t.id] for t in card.tickets if t.id in claims), key=lambda c: c.id)
+    claim = None
+    if mine:
+        claim = {
+            "ref": mine[0].ref,
+            "ts": int(mine[0].created_at.timestamp() * 1000),
+            "amount": sum(w["amount"] for w in wins),
+        }
+    return {"included": included, "wins": wins, "claim": claim}
 
 
 @router.post("/orders", status_code=201)
@@ -175,10 +205,13 @@ def my_orders(request: Request, db: Db) -> list[dict]:
         .options(
             selectinload(m.Order.items),
             selectinload(m.Order.cards).selectinload(m.Card.tickets),
-            selectinload(m.Order.cards).selectinload(m.Card.draw_day),
+            selectinload(m.Order.cards).selectinload(m.Card.draw_day).selectinload(m.DrawDay.result),
         )
     ).all()
-    return [order_json(o) for o in orders]
+    ticket_ids = [t.id for o in orders for c in o.cards for t in c.tickets]
+    found = db.scalars(sa.select(m.Claim).where(m.Claim.ticket_id.in_(ticket_ids)))
+    claims = {cl.ticket_id: cl for cl in found}
+    return [order_json(o, claims) for o in orders]
 
 
 @router.post("/cards/{card_id}/scratch")

@@ -95,4 +95,19 @@ def advance(sessions: sessionmaker, now: datetime, publisher) -> dict:
             if close_day(db, day_id, now):
                 sealed.append(db.get(m.DrawDay, day_id).label)
         published, unpublished = publish_seals(db, publisher)
-    return {"sealed": sealed, "published": published, "unpublished": unpublished}
+        results = publish_results(db, now)
+    return {"sealed": sealed, "published": published, "unpublished": unpublished, "results": results}
+
+
+def publish_results(db: Session, now: datetime) -> list[str]:
+    """Make drawn results public at 8:30 PM IST, or straight after the Draw run if it happened later."""
+    due = db.scalars(
+        sa.select(m.DrawDay)
+        .where(m.DrawDay.status == "drawn", m.DrawDay.publish_not_before <= now)
+        .with_for_update()
+    ).all()
+    for day in due:
+        day.status, day.published_at = "published", now
+        log.info("published the result of %s", day.label)
+    db.commit()
+    return [d.label for d in due]

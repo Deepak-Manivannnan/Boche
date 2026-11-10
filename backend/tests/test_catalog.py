@@ -73,3 +73,20 @@ def test_numbers_already_taken_or_repeated_in_the_batch_are_drawn_again():
 def test_drawing_gives_up_loudly_rather_than_looping_forever():
     with pytest.raises(RuntimeError):
         unique_numbers(1, already_taken=lambda batch: set(batch), rand=lambda n: 0)
+
+
+def test_server_prize_table_matches_the_prototype():
+    from app.catalog import prize
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed")
+    script = (
+        "const vm=require('vm'),fs=require('fs');const c={};vm.createContext(c);"
+        f"vm.runInContext(fs.readFileSync({json.dumps(str(FRONTEND_DIR / 'data.js'))},'utf8'),c);"
+        "console.log(JSON.stringify(c.BC_DRAW.prizes))"
+    )
+    out = subprocess.run([node, "-e", script], capture_output=True, text=True, check=True)
+    prizes = json.loads(out.stdout)
+    ranks = [(p["rank"], p["amount"]) for p in prizes for _ in range(p["count"])]
+    assert ranks == [prize(r) for r in range(1, 11)]

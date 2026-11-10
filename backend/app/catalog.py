@@ -61,3 +61,12 @@ def quote(items: dict[str, int]) -> Quote:
     tea_gst, log_gst = _gst(subtotal, TEA_GST_RATE), _gst(logistics, LOGISTICS_GST_RATE)
     gst = -(-(tea_gst + log_gst) // 100) * 100
     return Quote(lines, subtotal, logistics, tea_gst, log_gst, gst, subtotal + logistics + gst)
+
+
+# Prize money in rupees by draw rank, as in the prototype's BC_DRAW.prizes (a test keeps them identical).
+PRIZES = {1: ("1st prize", 100000), 2: ("2nd prize", 50000), 3: ("3rd prize", 25000)}
+CONSOLATION = ("Lucky 7", 10000)
+
+
+def prize(rank: int) -> tuple[str, int]:
+    return PRIZES.get(rank, CONSOLATION)

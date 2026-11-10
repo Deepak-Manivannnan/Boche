@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app import models as m
 from app.deps import get_db
 from app.lifecycle import advance
+from app.results import result_json, winners_public
 
 router = APIRouter(prefix="/api")
 Db = Annotated[Session, Depends(get_db)]
@@ -44,3 +45,38 @@ def ticket_list(label: Label, db: Db) -> Response:
 @router.get("/public/days/{label}/seal.json")
 def seal(label: Label, db: Db) -> Response:
     return Response(_closed_day(db, label).seal_json.encode("utf-8"), media_type="application/json")
+
+
+@router.get("/public/days/{label}/result.json")
+def result(label: Label, db: Db) -> dict:
+    day = db.scalar(sa.select(m.DrawDay).where(m.DrawDay.label == label))
+    if day is None or day.status != "published":
+        raise HTTPException(status_code=404, detail="The result of this Draw day is not published yet")
+    return result_json(db, day)
+
+
+@router.get("/public/days")
+def recent_days(db: Db) -> list[dict]:
+    """The last 30 Draw days that have closed, newest first, with Winners once published."""
+    days = db.scalars(
+        sa.select(m.DrawDay)
+        .where(m.DrawDay.seal_json.is_not(None))
+        .order_by(m.DrawDay.day.desc(), m.DrawDay.id.desc())
+        .limit(30)
+    ).all()
+    return [
+        {
+            "label": d.label,
+            "kind": d.kind,
+            "day": d.day.isoformat(),
+            "status": d.status,
+            "ticketCount": d.ticket_count,
+            "fingerprint": d.fingerprint,
+            "drandRound": d.drand_round,
+            "sealUrl": d.seal_url,
+            "publishNotBefore": d.publish_not_before.isoformat(),
+            "publishedAt": d.published_at.isoformat() if d.published_at else None,
+            "winners": winners_public(db, d) if d.status == "published" else None,
+        }
+        for d in days
+    ]

@@ -1,13 +1,15 @@
 """Entering a Scratch card into the draw, and refunds (Admin only)."""
 
+import secrets
 from typing import Annotated
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app import models as m
+from app.catalog import prize
 from app.deps import current_user, get_db, require_admin
 from app.drawdays import accepts_entries, entry_day, real_day
 
@@ -90,3 +92,54 @@ def refund_order(order_id: str, request: Request, db: Db) -> dict:
             ticket.status, ticket.cancelled_at = "cancelled", now
     db.commit()
     return {"id": order.public_id, "status": order.status, "cancelledTickets": len(tickets)}
+
+
+class NewClaim(BaseModel):
+    cardId: str = Field(min_length=1, max_length=40)  # noqa: N815 (JSON field name)
+
+
+@router.post("/claims", status_code=201)
+def claim_prize(body: NewClaim, request: Request, response: Response, db: Db) -> dict:
+    """A Customer claims the prize for a published Winner on one of their cards. One Claim per Ticket."""
+    user = current_user(request, db)
+    now = request.app.state.clock.now()
+    card = db.scalar(
+        sa.select(m.Card)
+        .join(m.Order)
+        .where(m.Card.public_id == body.cardId, m.Order.user_id == user.id)
+        .with_for_update()
+    )
+    if card is None:
+        raise HTTPException(status_code=404, detail="No such card")
+    day = card.draw_day
+    if day is None or day.status != "published" or day.result is None:
+        raise HTTPException(status_code=409, detail="This card's draw has no published result yet")
+    ranks = {w["ticket"]: w["rank"] for w in day.result.winners}
+    winning = [t for t in card.tickets if t.number in ranks]
+    if not winning:
+        raise HTTPException(status_code=409, detail="This card has no winning ticket")
+
+    existing = db.scalars(sa.select(m.Claim).where(m.Claim.ticket_id.in_([t.id for t in winning]))).all()
+    if not existing:
+        base = "CLM-" + secrets.token_hex(4).upper()
+        for i, t in enumerate(sorted(winning, key=lambda t: ranks[t.number])):
+            db.add(
+                m.Claim(
+                    ticket_id=t.id,
+                    user_id=user.id,
+                    ref=base if i == 0 else f"{base}-{i + 1}",
+                    status="submitted",
+                    created_at=now,
+                )
+            )
+        db.commit()
+        existing = db.scalars(sa.select(m.Claim).where(m.Claim.ticket_id.in_([t.id for t in winning]))).all()
+    else:
+        response.status_code = 200
+    first = min(existing, key=lambda c: c.id)
+    return {
+        "cardId": card.public_id,
+        "ref": first.ref,
+        "ts": int(first.created_at.timestamp() * 1000),
+        "amount": sum(prize(ranks[t.number])[1] for t in winning),
+    }
