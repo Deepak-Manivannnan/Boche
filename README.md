@@ -51,6 +51,20 @@ Open http://localhost:8000. The API lives under `/api`, and `/api/health` report
 
 The DB tests refuse to run unless the test database's name ends in `_test`, because they drop and recreate its tables.
 
+## Run a full day in test mode
+
+No need to wait for 8 PM. Sign in at `/#/staff` with an email listed in `ADMIN_EMAILS`, open **Tonight's draw**, then:
+
+1. **New test day**, then **Add 15,000 tickets** (20 test customers buy tea through the real paid-order path).
+2. **Close entries now**: the list is frozen, fingerprinted and sealed to GitHub; the Seal names a drand round about 30 s ahead.
+3. When the round is out, **Send OTP to founder**. On test days the code is also shown on screen (real days: SMS / server log only).
+4. Enter the code and **Run the draw**. With the default gap of 0 the result is published at once.
+5. **Verify this draw**, or run `python verifier/verify.py <test-day-label>`.
+
+From the command line instead: `python scripts/generate_tickets.py --count 15000 --close` (uses `DATABASE_URL`).
+
+Test days are labelled TEST everywhere, never take customer entries and never change a real Draw day.
+
 ## Hosting (Render + TiDB Cloud Starter)
 
 `render.yaml` defines one free web service. In the Render dashboard, set `DATABASE_URL` to the TiDB connection string over TLS:

@@ -1771,14 +1771,21 @@
     var head = '<div class="staff-head"><span class="ca-ic">' + ic('crown', 22) + '</span><div class="li-main"><div class="ca-t">Lucky Draw admin</div><div class="ca-s">' + esc(ME ? ME.name + ' · ' + ME.email : '') + '</div></div>' +
       '<button class="iconbtn" data-act="logout" aria-label="Sign out">' + ic('logout') + '</button></div>';
     if (!A || !A.days) return head + '<div class="pad center mt24"><span class="mini-spin" aria-label="Loading"></span></div>';
-    if (!d) return head + '<div class="pad mt16"><div class="surface sp-empty">' + ic('calendar', 18) + '<span>No draw days yet. A day appears when its first card is entered.</span></div></div>';
+    var testPanel = '<div class="field-l">Test mode</div><div class="surface" style="padding:12px 16px"><p class="fine" style="margin-top:0">Run a whole day now: seed tickets, close entries, send the OTP and draw. Test days are labelled TEST and never touch real draws.</p>' +
+      '<button class="btn btn-line btn-sm" data-act="admNewTest">' + ic('plus', 15) + 'New test day</button></div>';
+    if (!d) return head + '<div class="pad mt16"><div class="surface sp-empty">' + ic('calendar', 18) + '<span>No draw days yet. A day appears when its first card is entered.</span></div>' + testPanel + '</div>';
     var st = ADM_STATUS[d.status] || [d.status, 'plain'], body;
-    if (d.status === 'open') body = '<div class="rule-note mt16">' + ic('clock', 16) + '<span>Entries close at ' + istTime(d.closesAt) + '. The ticket list is then sealed automatically.</span></div>';
+    var seeding = A.seeding && A.seeding.label === d.label ? A.seeding : null;
+    if (d.status === 'open' && d.kind === 'test') body = '<div class="btn-row mt16"><button class="btn btn-line" data-act="admSeed"' + (seeding ? ' disabled' : '') + '>' + (seeding ? 'Adding… ' + num(seeding.done) + ' / ' + num(seeding.target) : 'Add 15,000 tickets') + '</button>' +
+      '<button class="btn btn-gold" data-act="admClose"' + (seeding || !d.ticketCount ? ' disabled' : '') + '>Close entries now</button></div>' +
+      '<p class="fine center">Tickets are bought by 20 test customers through the real paid-order path. Closing seals the list and picks a drand round about 30 s ahead.</p>';
+    else if (d.status === 'open') body = '<div class="rule-note mt16">' + ic('clock', 16) + '<span>Entries close at ' + istTime(d.closesAt) + '. The ticket list is then sealed automatically.</span></div>';
     else if (d.status === 'sealed' && !d.canRequestOtp) body = '<div class="rule-note mt16">' + ic('clock', 16) + '<span>Waiting for drand round ' + d.drandRound + ', released at ' + istTime(d.roundReleasedAt, true) + '. The founder’s OTP can be sent after that.</span></div>';
     else if (d.status === 'sealed' && !d.otpExpiresAt) body = '<button class="btn btn-gold mt16" data-act="admSendOtp">' + ic('phone', 18) + 'Send OTP to founder</button>' +
       '<p class="fine center">The founder gets a 6-digit code by SMS. It runs this draw only, on the sealed list and the drand round above.</p>';
     else if (d.status === 'sealed') body = '<div class="field-l">Founder’s OTP</div><div class="otp" id="otp">' + otpBoxes(6) + '</div><div class="err-text" id="otpErr"></div>' +
       '<button class="btn btn-gold mt16" data-otp-btn data-act="admRun" disabled>' + ic('sparkle', 16) + 'Run the draw</button>' +
+      (d.kind === 'test' && A.testCodes && A.testCodes[d.label] ? '<div class="demo-hint">TEST day code: <b>' + esc(A.testCodes[d.label]) + '</b></div>' : '') +
       '<p class="fine center mt12">Code sent · valid until ' + istTime(d.otpExpiresAt) + ' · <a class="link" href="javascript:void(0)" data-act="admSendOtp">Send a new code</a></p>';
     else body = '<div class="field-l">Winners · drawn at ' + istTime(d.drawnAt, true) + '</div><div class="list">' + (d.winners || []).map(function (x) {
         return '<div class="li win"><div class="li-main"><div class="li-t">' + prizeLabel(x.rank) + '</div><div class="li-s">#' + x.rank + ' · position ' + x.position + ' in the list</div></div><div class="win-r"><span class="lno">' + esc(x.ticket) + '</span></div></div>';
@@ -1792,12 +1799,13 @@
       '<div class="kv"><span>Fingerprint</span><span class="adm-fp">' + (d.fingerprint ? esc(d.fingerprint.slice(0, 16)) + '…' : '—') + '</span></div>' +
       '<div class="kv"><span>Seal</span><span>' + (d.sealUrl ? '<a class="link" href="' + esc(d.sealUrl) + '" target="_blank" rel="noopener">On GitHub</a>' : d.fingerprint ? 'Publishing to GitHub…' : '—') + '</span></div>' +
       '<div class="kv"><span>Randomness</span><span>' + (d.drandRound ? 'drand round ' + d.drandRound + ' · ' + istTime(d.roundReleasedAt, true) : '—') + '</span></div></div>' +
-      body + '<p class="fine center mt16">There is no way to redraw or change winners. Running again returns the saved result.</p></div>';
+      body + (d.status === 'published' ? '<div class="center">' + verifyLink(d.label) + '</div>' : '') +
+      '<p class="fine center mt16">There is no way to redraw or change winners. Running again returns the saved result.</p>' + testPanel + '</div>';
   };
   AFTER['admin-draw'] = function () {
     if (!ui.adm || !ui.adm.days || Date.now() - ui.adm.loadedAt > 10000) admLoad();
     if ($('otp')) wireOtp(function () { ACTIONS.admRun(); });
-    else timers.push(setInterval(function () { if (!$('otp')) admLoad(); }, 15000));
+    else { var dd = admDay(); timers.push(setInterval(function () { if (!$('otp') && !(ui.adm && ui.adm.seeding)) admLoad(); }, dd && dd.status === 'sealed' && !dd.canRequestOtp ? 3000 : 15000)); }
   };
 
   SCREENS['staff-otp'] = function () { return otpScreen('staff', ui.staffMobile, 'verifyStaffOtp'); };
@@ -1915,10 +1923,34 @@
     staffOutlet: function (el) { SES.outlet = el.dataset.id; saveSes(); rerender(); },
     staffLogout: function () { SES.staffId = null; saveSes(); ui.staffMobile = ''; go('welcome'); },
     admPick: function (el) { ui.adm.sel = el.dataset.id; rerender(); },
+    admNewTest: function () {
+      if (ui.adm.busy) return; ui.adm.busy = true;
+      BCAPI.post('/admin/test-days').then(function (day) { ui.adm.busy = false; ui.adm.sel = day.label; return admLoad().then(rerender); },
+        function (e) { ui.adm.busy = false; toast(e.message || 'Could not create a test day'); });
+    },
+    /* 15,000 tickets in batches of 2,500 so every request stays short */
+    admSeed: function () {
+      var d = admDay(); if (!d || ui.adm.seeding) return;
+      var S2 = ui.adm.seeding = { label: d.label, done: 0, target: 15000 };
+      (function next() {
+        if (S2.done >= S2.target) { ui.adm.seeding = null; toast(num(S2.target) + ' tickets added'); admLoad().then(rerender); return; }
+        BCAPI.post('/admin/test-days/' + encodeURIComponent(S2.label) + '/seed', { count: Math.min(2500, S2.target - S2.done) }).then(function () {
+          S2.done = Math.min(S2.target, S2.done + 2500); if (parse().name === 'admin-draw') rerender(); next();
+        }, function (e) { ui.adm.seeding = null; toast(e.message || 'Seeding stopped'); admLoad().then(rerender); });
+      })();
+      rerender();
+    },
+    admClose: function () {
+      var d = admDay(); if (!d || ui.adm.busy) return; ui.adm.busy = true;
+      BCAPI.post('/admin/test-days/' + encodeURIComponent(d.label) + '/close', { publishGapMinutes: 0 }).then(function (day) {
+        ui.adm.busy = false; ui.adm.days = ui.adm.days.map(function (x) { return x.label === day.label ? day : x; }); rerender(); toast('Entries closed · list sealed');
+      }, function (e) { ui.adm.busy = false; toast(e.message || 'Could not close'); });
+    },
     admSendOtp: function () {
       var d = admDay(); if (!d || ui.adm.busy) return;
       ui.adm.busy = true;
-      BCAPI.post('/admin/draw-days/' + encodeURIComponent(d.label) + '/otp').then(function () {
+      BCAPI.post('/admin/draw-days/' + encodeURIComponent(d.label) + '/otp').then(function (r) {
+        if (r.testCode) { ui.adm.testCodes = ui.adm.testCodes || {}; ui.adm.testCodes[d.label] = r.testCode; }
         ui.adm.busy = false; toast('OTP sent to the founder'); return admLoad().then(rerender);
       }, function (e) { ui.adm.busy = false; toast(e.message || 'Could not send the OTP'); });
     },
