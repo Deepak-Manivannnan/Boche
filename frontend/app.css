@@ -1529,3 +1529,36 @@ a.hm-cta, .hm-cta { min-height: 30px; }
 .vd-steps li { margin: 6px 0; }
 .vd-steps code, .kv code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; }
 .vd-on { box-shadow: 0 0 0 2px var(--gold); }
+/* ---------- Results reveal (reveal.js): ink background, gold type, the app's fonts ---------- */
+.rv { position: absolute; inset: 0; z-index: 60; background: radial-gradient(120% 80% at 50% 30%, #3a2c17 0%, var(--ink) 60%, #120d07 100%); color: var(--gold-xl); display: flex; align-items: center; justify-content: center; overflow: hidden; animation: rv-in .35s ease-out; }
+.rv.out { opacity: 0; transition: opacity .3s; }
+@keyframes rv-in { from { opacity: 0; } }
+.rv-matrix { position: absolute; inset: 0; pointer-events: none; opacity: .22; }
+.rv-matrix i { position: absolute; top: -110%; font: 600 13px/1.15 ui-monospace, Menlo, Consolas, monospace; color: var(--gold-l); writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 2px; font-style: normal; animation: rv-rain linear infinite; }
+@keyframes rv-rain { to { transform: translateY(220%); } }
+.rv-fx { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.rv-body { position: relative; z-index: 3; width: 100%; padding: 0 24px; text-align: center; }
+.rv-k { font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: var(--gold-l); }
+.rv-count { font: 700 96px/1 var(--serif); margin: 18px 0; background: var(--metal); -webkit-background-clip: text; background-clip: text; color: transparent; animation: rv-pulse .75s ease-out; }
+@keyframes rv-pulse { from { transform: scale(1.6); opacity: 0; } }
+.rv-s { font-size: 14px; color: rgba(243, 230, 196, .75); margin-top: 8px; line-height: 1.5; }
+.rv-prize { font: 600 20px/1.3 var(--serif); margin: 10px 0 22px; }
+.rv-prize.big { font-size: 26px; background: var(--metal); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.rv-no { font: 700 38px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .08em; color: #fff; text-shadow: 0 0 18px rgba(217, 180, 90, .55); padding: 18px 10px; border: 1px solid rgba(217, 180, 90, .35); border-radius: var(--r-md); background: rgba(0, 0, 0, .25); }
+.rv-no.done { color: var(--gold-xl); animation: rv-lock .4s ease-out; }
+@keyframes rv-lock { 50% { transform: scale(1.08); } }
+.rv-who { min-height: 24px; margin-top: 16px; font-size: 15px; color: rgba(243, 230, 196, .85); }
+.rv-you { font: 700 22px var(--serif); color: #fff; }
+.rv-me .rv-no { border-color: var(--gold-l); box-shadow: 0 0 0 3px rgba(217, 180, 90, .35), 0 0 40px rgba(217, 180, 90, .45); }
+.rv-title { font: 700 32px/1.15 var(--serif); margin: 10px 0 4px; color: #fff; }
+.rv-list { margin: 18px auto 0; max-width: 320px; text-align: left; border-top: 1px solid rgba(217, 180, 90, .25); }
+.rv-row { display: flex; justify-content: space-between; padding: 7px 2px; font-size: 13.5px; border-bottom: 1px solid rgba(217, 180, 90, .14); }
+.rv-row b { font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: .04em; }
+.rv-row.mine { color: #fff; font-weight: 600; }
+.rv-row.mine b { color: var(--gold-l); }
+.rv-verify { display: block; margin-top: 12px; font-size: 13px; color: var(--gold-l); }
+.rv-skip { position: absolute; top: 14px; right: 14px; z-index: 4; background: rgba(0, 0, 0, .3); color: var(--gold-xl); border: 1px solid rgba(217, 180, 90, .4); border-radius: 999px; padding: 6px 14px; font: 600 13px var(--font); cursor: pointer; }
+.rv-balloons i { position: absolute; bottom: -80px; width: 34px; height: 42px; border-radius: 50% 50% 48% 48%; opacity: .92; font-style: normal; animation: rv-float ease-in forwards; }
+.rv-balloons i::after { content: ''; position: absolute; left: 50%; top: 100%; width: 1px; height: 40px; background: rgba(243, 230, 196, .5); }
+@keyframes rv-float { to { transform: translateY(-760px) translateX(14px); } }
+@media (prefers-reduced-motion: reduce) { .rv, .rv-count, .rv-no.done, .rv-balloons i, .rv-matrix i { animation: none; } }

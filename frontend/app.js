@@ -1461,6 +1461,7 @@
   };
   AFTER.draw = function () {
     refreshResults();
+    maybeReveal();
     var el = $('drawCd'); if (!el) return;
     var at = new Date(dayKey() + 'T20:30:00+05:30'), polled = 0;   /* results are published at 8:30 PM IST */
     function tick() {
@@ -1475,6 +1476,26 @@
     }
     tick(); timers.push(setInterval(tick, 1000));
   };
+
+  /* ----- Results reveal (frontend/reveal.js): once per device per Draw day, over published winners only ----- */
+  var REVEAL_STOP = null;
+  function prizeAmount(rank) { var r = 0, a = 0; BC_DRAW.prizes.forEach(function (p) { for (var k = 0; k < p.count; k++) { r++; if (r === rank) a = p.amount; } }); return a; }
+  function playReveal(label, winners, mine, onDone) {
+    if (REVEAL_STOP || !window.BCREVEAL) return;
+    REVEAL_STOP = BCREVEAL.play($('device'), {
+      winners: winners.map(function (w) { return { rank: w.rank, ticket: w.ticket, name: w.name, label: w.label || prizeLabel(w.rank), amount: w.amount || prizeAmount(w.rank) }; }),
+      myNumbers: mine, firstName: BC_MEMBER.firstName, dayLabel: /^\d{4}-/.test(label) ? dayLabel(label) : 'TEST',
+      verifyHref: '#/verify-draw/' + encodeURIComponent(label), confetti: confetti, chime: playChime,
+      onDone: function () { REVEAL_STOP = null; if (onDone) onDone(); }
+    });
+  }
+  function maybeReveal() {
+    var key = dayKey(), list = RESULTS[key], seen = 'bocheclub-reveal-' + key;
+    if (!list || REVEAL_STOP) return;
+    try { if (localStorage.getItem(seen)) return; localStorage.setItem(seen, '1'); } catch (e) { return; }
+    var mine = allCards().filter(function (x) { return x.c.drawDate === key; }).reduce(function (t, x) { return t.concat(x.c.nos); }, []);
+    playReveal(key, list, mine);
+  }
 
   /* ----- Verify the draw (public): every closed Draw day's files, its Seal on GitHub, its drand round, and the Verifier ----- */
   var DRAND_CHAIN = '52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971';
@@ -1799,7 +1820,7 @@
       '<div class="kv"><span>Fingerprint</span><span class="adm-fp">' + (d.fingerprint ? esc(d.fingerprint.slice(0, 16)) + '…' : '—') + '</span></div>' +
       '<div class="kv"><span>Seal</span><span>' + (d.sealUrl ? '<a class="link" href="' + esc(d.sealUrl) + '" target="_blank" rel="noopener">On GitHub</a>' : d.fingerprint ? 'Publishing to GitHub…' : '—') + '</span></div>' +
       '<div class="kv"><span>Randomness</span><span>' + (d.drandRound ? 'drand round ' + d.drandRound + ' · ' + istTime(d.roundReleasedAt, true) : '—') + '</span></div></div>' +
-      body + (d.status === 'published' ? '<div class="center">' + verifyLink(d.label) + '</div>' : '') +
+      body + (d.status === 'published' ? '<div class="btn-row mt12"><button class="btn btn-line btn-sm" data-act="admReveal">' + ic('sparkle', 15) + 'Preview the reveal</button>' + verifyLink(d.label) + '</div>' : '') +
       '<p class="fine center mt16">There is no way to redraw or change winners. Running again returns the saved result.</p>' + testPanel + '</div>';
   };
   AFTER['admin-draw'] = function () {
@@ -1923,6 +1944,7 @@
     staffOutlet: function (el) { SES.outlet = el.dataset.id; saveSes(); rerender(); },
     staffLogout: function () { SES.staffId = null; saveSes(); ui.staffMobile = ''; go('welcome'); },
     admPick: function (el) { ui.adm.sel = el.dataset.id; rerender(); },
+    admReveal: function () { var d = admDay(); if (d && d.winners) playReveal(d.label, d.winners, []); },
     admNewTest: function () {
       if (ui.adm.busy) return; ui.adm.busy = true;
       BCAPI.post('/admin/test-days').then(function (day) { ui.adm.busy = false; ui.adm.sel = day.label; return admLoad().then(rerender); },
@@ -2350,6 +2372,7 @@
   function render(keepScroll) {
     if (!keepScroll) trackNav();
     var r = resolve(parse()), scr = $('screen'), top = scr.scrollTop;
+    if (REVEAL_STOP && r.name !== 'draw' && r.name !== 'admin-draw') REVEAL_STOP();
     if (!keepScroll) { clearTimers(); closeSheet(true); ui.pageMenu = false; ui.teaSeen = false; }
     $('device').classList.toggle('has-tabs', !!TABS[r.name]);
     scr.innerHTML = SCREENS[r.name](r.arg);

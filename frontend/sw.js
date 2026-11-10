@@ -1,6 +1,6 @@
 /* BocheClub service worker ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â caches the app shell so the card opens offline */
-var CACHE = 'bocheclub-v138';
-var SHELL = ['./', 'index.html', 'app.css', 'app.js', 'api.js', 'data.js', 'qr.js', 'manifest.json', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'img/portrait.webp', 'img/member.webp', 'img/shakesbierre.png'];
+var CACHE = 'bocheclub-v139';
+var SHELL = ['./', 'index.html', 'app.css', 'app.js', 'api.js', 'reveal.js', 'data.js', 'qr.js', 'manifest.json', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'img/portrait.webp', 'img/member.webp', 'img/shakesbierre.png'];
 self.addEventListener('install', function (e) { e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); })); self.skipWaiting(); });
 self.addEventListener('activate', function (e) {
   e.waitUntil(caches.keys().then(function (k) { return Promise.all(k.filter(function (x) { return x !== CACHE; }).map(function (x) { return caches.delete(x); })); }));
