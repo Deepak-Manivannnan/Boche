@@ -143,7 +143,15 @@ def _refused(e: TestModeRefused) -> HTTPException:
 def new_test_day(request: Request, db: Db) -> dict:
     require_admin(request, db)
     now = request.app.state.clock.now()
-    return day_json(db, create_test_day(db, now), now)
+    exists = getattr(request.app.state.seal_publisher, "exists", None)
+
+    def taken(label: str) -> bool:  # GitHub unreachable: the label is still free in this database
+        try:
+            return bool(exists and exists(label))
+        except OSError:
+            return False
+
+    return day_json(db, create_test_day(db, now, taken), now)
 
 
 @router.post("/test-days/{label}/seed")

@@ -1,11 +1,13 @@
 """Test mode: run a whole Draw day on demand (ticket 12).
 
-A Test day is a separate Draw day (kind "test", label "test-…"). It is seeded through the real issuing
-path (priced Orders, a signed mock-payment confirmation, server-generated lucky numbers) and then uses the
+A Test day is a separate Draw day (kind "test", label "test-1", "test-2", …). It is seeded through the real
+issuing path (priced Orders, a signed mock-payment confirmation, server-generated lucky numbers) and then uses the
 same Seal, Founder OTP, draw and publish code as a real day. Nothing here can select or change a real Draw
 day: every function refuses a day whose kind is not "test"."""
 
+import re
 import secrets
+from collections.abc import Callable
 from datetime import datetime, timedelta
 
 import sqlalchemy as sa
@@ -28,9 +30,15 @@ class TestModeRefused(Exception):
         self.status, self.detail = status, detail
 
 
-def create_test_day(db: Session, now: datetime) -> m.DrawDay:
+def create_test_day(db: Session, now: datetime, taken: Callable[[str], bool] | None = None) -> m.DrawDay:
+    """Labels run test-1, test-2, …: one past the highest number used so far, skipping any label `taken`
+    reports as already used elsewhere (a Seal file on GitHub from another environment)."""
     local = now.astimezone(IST)
-    label = f"test-{local:%Y%m%d-%H%M%S}-{secrets.token_hex(2)}"
+    used = db.scalars(sa.select(m.DrawDay.label).where(m.DrawDay.kind == "test")).all()
+    n = max([int(x[5:]) for x in used if re.fullmatch(r"test-\d+", x)] or [0]) + 1
+    while taken and taken(f"test-{n}"):
+        n += 1
+    label = f"test-{n}"
     day = m.DrawDay(
         label=label,
         kind="test",

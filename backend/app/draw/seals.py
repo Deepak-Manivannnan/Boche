@@ -36,6 +36,13 @@ class GitHubSealPublisher:
             "User-Agent": "boche-lucky-draw",
         }
 
+    def exists(self, label: str) -> bool:
+        """Whether seals/<label>.json is already in the repository."""
+        status, _ = self._http("GET", f"{API}/repos/{self.repo}/contents/seals/{label}.json", self._headers)
+        if status not in (200, 404):
+            raise OSError(f"GitHub answered {status} when checking the Seal for {label}")
+        return status == 200
+
     def publish(self, label: str, content: bytes) -> tuple[str | None, str]:
         """Commit seals/<label>.json. Returns (commit sha, or None if it was already there; file URL)."""
         url = f"{API}/repos/{self.repo}/contents/seals/{label}.json"

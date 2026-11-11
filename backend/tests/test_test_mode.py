@@ -172,3 +172,14 @@ def test_a_real_days_otp_is_never_shown_on_screen(make_client):
     w = sealed_day(make_client)
     at(w.admin, 20, 16)
     assert "testCode" not in w.admin.post("/api/admin/draw-days/2026-11-10/otp").json()
+
+
+def test_test_days_are_numbered_and_skip_labels_already_sealed_elsewhere(clean_db, session):
+    from datetime import UTC, datetime
+
+    from app.draw.testmode import create_test_day
+
+    now = datetime(2026, 11, 10, 12, 0, tzinfo=UTC)
+    assert create_test_day(session, now).label == "test-1"
+    assert create_test_day(session, now, lambda label: label in {"test-2", "test-3"}).label == "test-4"
+    assert create_test_day(session, now).label == "test-5"
