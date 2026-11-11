@@ -16,7 +16,7 @@ from app.core.clock import Clock, SystemClock
 from app.core.config import REPO_ROOT, Settings
 from app.draw.drand import fetch_round
 from app.draw.lifecycle import advance
-from app.draw.otp import LogOtpSender
+from app.draw.otp import LogOtpSender, Msg91Sender
 from app.draw.seals import GitHubSealPublisher
 
 log = logging.getLogger("boche")
@@ -53,7 +53,11 @@ def create_app(
         else None
     )
     app.state.last_advance = None
-    app.state.otp_sender = LogOtpSender()  # PENDING: the client's OTP service
+    app.state.otp_sender = (
+        Msg91Sender(settings.msg91_auth_key, settings.msg91_template_id, settings.msg91_otp_variable)
+        if settings.sms_mode == "msg91" and settings.msg91_auth_key and settings.msg91_template_id
+        else LogOtpSender()
+    )
     app.state.drand_fetch = fetch_round
 
     @app.middleware("http")

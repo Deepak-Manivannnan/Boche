@@ -1804,8 +1804,8 @@
     else if (d.status === 'open') body = '<div class="rule-note mt16">' + ic('clock', 16) + '<span>Entries close at ' + istTime(d.closesAt) + '. The ticket list is then sealed automatically.</span></div>';
     else if (d.status === 'sealed' && !d.canRequestOtp) body = '<div class="rule-note mt16">' + ic('clock', 16) + '<span>Waiting for drand round ' + d.drandRound + ', released at ' + istTime(d.roundReleasedAt, true) + '. The founder’s OTP can be sent after that.</span></div>';
     else if (d.status === 'sealed' && !d.otpExpiresAt) body = '<button class="btn btn-gold mt16" data-act="admSendOtp">' + ic('phone', 18) + 'Send OTP to founder</button>' +
-      '<p class="fine center">The founder gets a 6-digit code by SMS. It runs this draw only, on the sealed list and the drand round above.</p>';
-    else if (d.status === 'sealed') body = '<div class="field-l">Founder’s OTP</div><div class="otp otp6" id="otp">' + otpBoxes(6) + '</div><div class="err-text" id="otpErr"></div>' +
+      '<p class="fine center">The founder gets a 4-digit code by SMS. It runs this draw only, on the sealed list and the drand round above.</p>';
+    else if (d.status === 'sealed') body = '<div class="field-l">Founder’s OTP</div><div class="otp" id="otp">' + otpBoxes(4) + '</div><div class="err-text" id="otpErr"></div>' +
       '<button class="btn btn-gold mt16" data-otp-btn data-act="admRun" disabled>' + ic('sparkle', 16) + 'Run the draw</button>' +
       (d.kind === 'test' && A.testCodes && A.testCodes[d.label] ? '<div class="demo-hint">TEST day code: <b>' + esc(A.testCodes[d.label]) + '</b></div>' : '') +
       '<p class="fine center mt12">Code sent · valid until ' + istTime(d.otpExpiresAt) + ' · <a class="link" href="javascript:void(0)" data-act="admSendOtp">Send a new code</a></p>';

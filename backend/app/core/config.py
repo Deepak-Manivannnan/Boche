@@ -37,7 +37,12 @@ class Settings:
     payment_secret: str = ""  # shared with the (mock) payment provider to sign confirmations
     seals_repo: str = ""  # owner/repo of the public GitHub seals repository
     seals_token: str = ""  # fine-grained token: Contents read/write on that one repository only
-    founder_mobile: str = ""  # PENDING: the Founder's number for the OTP SMS (FOUNDER_MOBILE)
+    founder_mobile: str = ""  # the Founder's number for the OTP SMS (FOUNDER_MOBILE)
+    sms_mode: str = ""  # "msg91" sends real SMS; anything else writes the OTP to the server log
+    msg91_auth_key: str = ""
+    msg91_template_id: str = ""
+    msg91_otp_variable: str = "OTP"
+    otp_expiry_minutes: int = 10
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -54,6 +59,11 @@ class Settings:
             seals_repo=os.environ.get("SEALS_REPO", "").strip(),
             seals_token=os.environ.get("SEALS_GITHUB_TOKEN", "").strip(),
             founder_mobile=os.environ.get("FOUNDER_MOBILE", "").strip(),
+            sms_mode=os.environ.get("SMS_MODE", "").strip().lower(),
+            msg91_auth_key=os.environ.get("MSG91_AUTH_KEY", "").strip(),
+            msg91_template_id=os.environ.get("MSG91_OTP_TEMPLATE_ID", "").strip(),
+            msg91_otp_variable=os.environ.get("MSG91_OTP_VARIABLE", "OTP").strip() or "OTP",
+            otp_expiry_minutes=int(os.environ.get("OTP_EXPIRY_MINUTES", "10") or 10),
         )
 
 

@@ -24,7 +24,7 @@ Label = Annotated[str, Path(pattern=r"^[A-Za-z0-9-]{1,40}$")]
 
 
 class OtpEntry(BaseModel):
-    code: str = Field(pattern=r"^\d{6}$")
+    code: str = Field(pattern=r"^\d{4}$")
 
 
 def _iso(t):
@@ -97,7 +97,15 @@ def send_founder_otp(label: Label, request: Request, db: Db) -> dict:
     if now < day.draw_not_before:
         raise HTTPException(status_code=409, detail="The Randomness round is not released yet")
     try:
-        challenge = request_otp(db, day, admin, now, state.otp_sender, state.settings.founder_mobile)
+        challenge = request_otp(
+            db,
+            day,
+            admin,
+            now,
+            state.otp_sender,
+            state.settings.founder_mobile,
+            timedelta(minutes=state.settings.otp_expiry_minutes),
+        )
     except OtpRefused as e:
         raise HTTPException(status_code=e.status, detail=e.detail) from e
     sent = {"sent": True, "expiresAt": _iso(challenge.expires_at)}

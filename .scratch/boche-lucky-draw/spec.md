@@ -73,7 +73,7 @@ A backend behind the existing screens makes the flow real:
 
 ### Founder
 42. As the Founder, I want the OTP message to name the Draw day, the Ticket count and the start of the Fingerprint, so that I know exactly what I'm approving.
-43. As the Founder, I want each OTP to expire after 5 minutes and work only for that one Draw day, so that an old code can't be reused.
+43. As the Founder, I want each OTP to expire after 10 minutes and work only for that one Draw day, so that an old code can't be reused.
 44. As the Founder, I want OTP requests to have a cooldown, so that I'm not flooded with messages.
 
 ### Outsider and auditor
@@ -208,7 +208,7 @@ All other screens keep their layout and behaviour, now backed by the API.
 ## Further Notes
 
 - Decisions are recorded in `docs/adr/0001` to `0007`. Terms follow `GLOSSARY.md`.
-- The client's OTP service details are still pending. The development sender logs codes until they arrive.
+- The Founder's OTP is delivered by the client's MSG91 account (Flow API, DLT template with one variable). Our server makes the 4-digit code; MSG91 only delivers it. Without SMS_MODE=msg91 the code is written to the server log.
 - Deliverables beyond code: a README (setup, running a Test day, running the Verifier, assumptions) and a design note of at most two pages with an honest threat table.
 - Known limitations for the design note:
   - withholding the OTP delays the official result but cannot hide it

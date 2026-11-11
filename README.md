@@ -25,7 +25,12 @@ Needs Python 3.11+, a MySQL 8 server and Node (only for one frontend test).
    ADMIN_EMAILS=you@gmail.com
    SESSION_SECRET=<any random string of 32+ characters>
    COOKIE_SECURE=false
-   FOUNDER_MOBILE=           # pending: until set, the Founder's OTP is written to the server log
+   FOUNDER_MOBILE=<10-digit mobile>   # receives the 4-digit OTP that starts each draw
+   SMS_MODE=msg91                     # leave unset to write the OTP to the server log instead
+   MSG91_AUTH_KEY=<key>               # the client's MSG91 account (Flow API)
+   MSG91_OTP_TEMPLATE_ID=6a8fb2b2bcf52c77450ebc42
+   MSG91_OTP_VARIABLE=OTP
+   OTP_EXPIRY_MINUTES=10
    ```
 
    The Google client must list `http://localhost` and `http://localhost:8000` as authorised JavaScript origins. Open the app at `http://localhost:8000`, not `127.0.0.1`.

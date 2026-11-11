@@ -35,6 +35,17 @@ services:
       # Fine-grained token: Contents read/write on the seals repository only. Set in the dashboard.
       - key: SEALS_GITHUB_TOKEN
         sync: false
-      # PENDING: the Founder's mobile number for the OTP SMS. Until set, the OTP is only written to the logs.
+      # The Founder's OTP: our server makes a 4-digit code, MSG91's Flow API only delivers it.
+      # Without SMS_MODE=msg91 (or a key/template) the OTP is written to the server log instead.
       - key: FOUNDER_MOBILE
         sync: false
+      - key: SMS_MODE
+        value: msg91
+      - key: MSG91_AUTH_KEY
+        sync: false
+      - key: MSG91_OTP_TEMPLATE_ID
+        value: 6a8fb2b2bcf52c77450ebc42
+      - key: MSG91_OTP_VARIABLE
+        value: OTP
+      - key: OTP_EXPIRY_MINUTES
+        value: "10"

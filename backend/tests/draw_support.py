@@ -1,7 +1,6 @@
 """Test helpers for a Draw day that has closed: fake OTP sender, fake drand, and a ready-made sealed day."""
 
 import hashlib
-import re
 from dataclasses import replace
 from types import SimpleNamespace
 
@@ -15,14 +14,15 @@ DAY = "2026-11-10"
 
 class FakeOtp:
     def __init__(self):
-        self.sent = []
+        self.sent, self.codes = [], []
 
-    def send(self, to, text):
+    def send(self, to, code, text):
         self.sent.append((to, text))
+        self.codes.append(code)
 
     @property
     def code(self):
-        return re.search(r"OTP (\d{6})\b", self.sent[-1][1]).group(1)
+        return self.codes[-1]
 
 
 def drand_value(round_no):

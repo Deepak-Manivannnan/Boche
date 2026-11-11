@@ -51,7 +51,7 @@ def as_rows(winners):
 def test_only_admins_can_see_or_act_on_draw_days(w):
     for method, path in (("get", "/api/admin/draw-days"), ("get", BASE), ("post", f"{BASE}/otp")):
         assert getattr(w.arun, method)(path).status_code == 403
-    assert run(SimpleNamespace(admin=w.arun), "123456").status_code == 403
+    assert run(SimpleNamespace(admin=w.arun), "1234").status_code == 403
 
 
 def test_an_admin_removed_from_the_list_loses_access_immediately(w):
@@ -98,7 +98,8 @@ def test_the_founder_gets_an_otp_naming_the_day_ticket_count_and_fingerprint(w):
     fp = w.admin.get(BASE).json()["fingerprint"]
     assert to == "+919800000000"
     assert DAY in text and "16 tickets" in text and fp[:12] in text
-    assert re.fullmatch(r"\d{6}", w.state.otp_sender.code)
+    assert re.fullmatch(r"\d{4}", w.state.otp_sender.code)
+    assert f"OTP {w.state.otp_sender.code} " in text
 
 
 def test_a_second_otp_request_within_a_minute_is_refused(w):
@@ -126,13 +127,13 @@ def test_a_new_otp_replaces_the_old_one(w):
 
 def test_the_draw_cannot_run_without_an_otp_being_requested(w):
     ready(w)
-    assert run(w, "123456").status_code == 409
+    assert run(w, "1234").status_code == 409
 
 
 def test_a_wrong_otp_does_not_run_the_draw(w):
     ready(w)
     ask_otp(w)
-    wrong = "000000" if w.state.otp_sender.code != "000000" else "111111"
+    wrong = "0000" if w.state.otp_sender.code != "0000" else "1111"
     res = run(w, wrong)
     assert res.status_code == 401
     assert "4 tries left" in res.json()["detail"]
@@ -143,20 +144,22 @@ def test_five_wrong_otps_lock_that_code(w):
     ready(w)
     ask_otp(w)
     good = w.state.otp_sender.code
-    wrong = "000000" if good != "000000" else "111111"
+    wrong = "0000" if good != "0000" else "1111"
     for _ in range(5):
         run(w, wrong)
     assert run(w, good).status_code == 429
 
 
-def test_an_otp_expires_after_five_minutes(w):
+def test_an_otp_expires_after_ten_minutes(w):
     ready(w)
     ask_otp(w)
-    at(w.admin, 20, 20, 6)
+    at(w.admin, 20, 24, 50)
+    assert w.admin.get(BASE).json()["otpExpiresAt"] is not None
+    at(w.admin, 20, 25, 6)
     assert run(w, w.state.otp_sender.code).status_code == 401
 
 
-@pytest.mark.parametrize("bad", ["12345", "1234567", "abcdef", ""])
+@pytest.mark.parametrize("bad", ["123", "12345", "abcd", ""])
 def test_a_malformed_otp_is_rejected_without_counting(w, bad):
     ready(w)
     ask_otp(w)
@@ -184,7 +187,7 @@ def test_running_again_returns_the_saved_result_and_never_draws_twice(w, db_engi
     code = w.state.otp_sender.code
     first = run(w, code).json()
     at(w.admin, 20, 40)
-    again = run(w, "999999")
+    again = run(w, "9999")
     assert again.status_code == 200
     assert again.json()["winners"] == first["winners"]
     assert ask_otp(w).status_code == 409  # nothing left to approve
@@ -230,7 +233,7 @@ def test_every_run_attempt_is_logged_in_a_hash_chain(w, db_engine):
     run(w, w.state.otp_sender.code)
     w.state.drand_fetch.down = False
     run(w, w.state.otp_sender.code)
-    run(w, "000000")
+    run(w, "0000")
     with db_engine.connect() as conn:
         rows = conn.execute(sa.select(m.DrawRun).order_by(m.DrawRun.seq)).all()
     assert [r.outcome for r in rows] == ["failed", "completed", "repeat"]
