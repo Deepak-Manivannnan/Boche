@@ -1240,7 +1240,7 @@
   function drawResults(key) {
     var list = RESULTS[key]; if (!list) return null;
     var mine = myNumbers();
-    return list.map(function (w) { return { rank: w.label, amount: w.amount, no: w.ticket, name: w.name, mob: w.mobile, member: mine[w.ticket] ? BC_MEMBER.id : null }; });
+    return list.map(function (w, i) { var n = +w.rank || i + 1; return { place: n, rank: n + ({ 1: 'st', 2: 'nd', 3: 'rd' }[n] || 'th') + ' prize', amount: w.amount, no: w.ticket, name: w.name, mob: w.mobile, member: mine[w.ticket] ? BC_MEMBER.id : null }; });
   }
   function refreshResults(force) {
     if (!force && Date.now() - resultsAt < 15000) return Promise.resolve();
@@ -1435,24 +1435,29 @@
     var todayNos = nosFor(function (c) { return c.submitted && c.drawDate === today; });
     var nextNos = nosFor(function (c) { return c.submitted && c.drawDate > today; });
     function winners(list) {
-      return '<div class="list">' + list.map(function (w) {
-        return '<div class="li win' + (w.member === BC_MEMBER.id ? ' me' : '') + '"><div class="li-main"><div class="li-t">' + esc(w.name) + (w.member === BC_MEMBER.id ? ' <span class="badge ok">You</span>' : '') + '</div>' +
-          '<div class="li-s">' + esc(w.rank) + (w.mob ? ' · ' + esc(w.mob) : '') + '</div></div><div class="win-r"><b>' + inr(w.amount) + '</b><span class="lno">' + esc(w.no) + '</span></div></div>';
+      return '<div class="wl">' + list.map(function (w) {
+        var me = w.member === BC_MEMBER.id, medal = { 1: ' gold', 2: ' silver', 3: ' bronze' }[w.place] || '';
+        return '<div class="wl-r' + (me ? ' me' : '') + '"><span class="wl-p' + medal + '" aria-label="' + esc(w.rank) + '">' + w.place + '</span>' +
+          '<span class="wl-n">' + esc(w.name) + (me ? ' <span class="badge ok">You</span>' : '') + '</span>' +
+          '<span class="lno wl-t">' + esc(w.no) + '</span><b class="wl-a">' + inr(w.amount) + '</b></div>';
       }).join('') + '</div>';
     }
-    var DAYS = 30, sel = ui.drawSel && ui.drawSel <= today && ui.drawSel >= dayShift(today, -(DAYS - 1)) ? ui.drawSel : dayShift(today, -1);
-    var first = dayShift(today, -(DAYS - 1)), lead = (new Date(first + 'T12:00:00').getDay() + 6) % 7, cells = '', MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    /* Today's winners are listed above, so the calendar covers the 30 days before today. Nothing is selected
+       until a day is tapped; tapping it again closes its list. */
+    var DAYS = 30, sel = ui.drawSel && ui.drawSel < today && ui.drawSel >= dayShift(today, -DAYS) ? ui.drawSel : null;
+    var first = dayShift(today, -DAYS), lead = (new Date(first + 'T12:00:00').getDay() + 6) % 7, cells = '', MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     for (var e = 0; e < lead; e++) cells += '<span class="cal-c empty"></span>';
     for (var i = 0; i < DAYS; i++) {
       var k = dayShift(first, i), dn = +k.slice(8), r = drawResults(k), won = r && r.some(function (w) { return w.member === BC_MEMBER.id; });
-      cells += '<button class="cal-c' + (k === today ? ' today' : '') + (r ? '' : ' pending') + (k === sel ? ' on' : '') + (won ? ' won' : '') + '" data-act="drawDay" data-id="' + k + '" aria-label="' + esc(dayLabel(k)) + '"' + (k === sel ? ' aria-pressed="true"' : '') + '>' +
+      cells += '<button class="cal-c' + (r ? '' : ' pending') + (k === sel ? ' on' : '') + (won ? ' won' : '') + '" data-act="drawDay" data-id="' + k + '" aria-label="' + esc(dayLabel(k)) + '"' + (k === sel ? ' aria-pressed="true"' : '') + '>' +
         ((i === 0 || dn === 1) ? '<small>' + MON[+k.slice(5, 7) - 1] + '</small>' : '') + '<b>' + dn + '</b><i></i></button>';
     }
-    var selRes = drawResults(sel);
+    var selRes = sel ? drawResults(sel) : null;
     var calendar = '<div class="cal"><div class="cal-w">' + ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(function (d) { return '<span>' + d + '</span>'; }).join('') + '</div><div class="cal-g">' + cells + '</div>' +
       '<div class="cal-key"><span><i class="k-d"></i>Draw held</span><span><i class="k-w"></i>You won</span></div></div>' +
-      '<div class="sec-h" style="padding:0;margin:16px 0 8px"><h3>' + esc(dayLabel(sel)) + (sel === today || sel === dayShift(today, -1) ? ' · ' + esc(new Date(sel + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })) : '') + '</h3><span class="li-s">' + (selRes ? selRes.length + ' winners' : 'Draw at ' + drawTimeLabel()) + '</span></div>' +
-      (selRes ? winners(selRes) + verifyLink(sel) : '<div class="surface draw-wait"><div class="li-s">Winners appear here after the ' + drawTimeLabel() + ' draw.</div></div>');
+      (!sel ? '<p class="fine center" style="margin-top:10px">Tap a day to see its winners.</p>' :
+      '<div class="sec-h" style="padding:0;margin:16px 0 8px"><h3>' + esc(dayLabel(sel)) + (sel === dayShift(today, -1) ? ' · ' + esc(new Date(sel + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })) : '') + '</h3><span class="li-s">' + (selRes ? selRes.length + ' winners' : 'No draw') + '</span></div>' +
+      (selRes ? winners(selRes) + verifyLink(sel) : '<div class="surface draw-wait"><div class="li-s">No published draw on this day.</div></div>'));
     return topbar('Lucky Draw', 'home') + '<div class="pad">' +
       '<div class="draw-hero"><span class="hm-eyebrow">' + ic('gift', 14) + 'Every day at ' + drawTimeLabel() + '</span>' +
         '<div class="dh-top">' + inr(BC_DRAW.prizes[0].amount) + '</div><div class="dh-s">1st prize · ' + drawWinnerCount() + ' winners daily</div>' +
@@ -1462,7 +1467,7 @@
       }).join('') : '') +
       '<div class="sec-h" style="padding:0;margin-top:22px"><h3>Today · ' + esc(new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })) + '</h3></div>' +
       (res ? winners(res) + verifyLink(today)
-        : '<div class="surface draw-wait"><div class="dw-k">Results in</div><div class="dw-v" id="drawCd"></div>' +
+        : '<div class="surface draw-wait"><div class="dw-k" id="drawCdK">Results in</div><div class="dw-v" id="drawCd"></div>' +
           '<div class="li-s">' + (todayNos.length ? 'Your ' + (todayNos.length > 1 ? todayNos.length + ' numbers' : 'number') + ' in today’s draw' : 'No entries from you yet. Order tea to get a scratch card.') + '</div>' +
           (todayNos.length ? '<div class="chips mt8">' + todayNos.map(function (no) { return '<span class="lno big">' + esc(no) + '</span>'; }).join('') + '</div>' : '') +
           '</div>') +
@@ -1478,7 +1483,8 @@
     function tick() {
       var ms = at - new Date();
       if (ms <= 0) {
-        el.textContent = 'Any moment';
+        el.textContent = 'Waiting for the draw to run'; el.classList.add('sm');
+        var k = $('drawCdK'); if (k) k.textContent = 'Today’s draw';
         if (Date.now() - polled > 20000) { polled = Date.now(); refreshResults(true); }
         return;
       }
@@ -2249,7 +2255,7 @@
     soonBiz: function (el) { toast(biz(el.dataset.id).name + ' joins Boche soon'); },
     notifs: function () { toast('You’re all caught up'); },
     flip: function () { $('flip').classList.toggle('flipped'); },
-    drawDay: function (el) { ui.drawSel = el.dataset.id; rerender(); },
+    drawDay: function (el) { ui.drawSel = ui.drawSel === el.dataset.id ? null : el.dataset.id; rerender(); },
     photoPick: function () { var f = $('photoIn'); if (f) f.click(); },
     exploreFilter: function (el) { ui.exploreFilter = el.dataset.id; rerender(); },
     actTab: function (el) { ui.actTab = el.dataset.id; rerender(); },
