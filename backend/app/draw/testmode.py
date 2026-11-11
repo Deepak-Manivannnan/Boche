@@ -1,8 +1,8 @@
 """Test mode: run a whole Draw day on demand (ticket 12).
 
 A Test day is a separate Draw day (kind "test", label "test-1", "test-2", …). It is seeded through the real
-issuing path (priced Orders, a signed mock-payment confirmation, server-generated lucky numbers) and then uses the
-same Seal, Founder OTP, draw and publish code as a real day. Nothing here can select or change a real Draw
+issuing path (priced Orders, a signed mock-payment confirmation, server-generated lucky numbers) and then uses
+the same Seal, Founder OTP, draw and publish code as a real day. Nothing here can select or change a real Draw
 day: every function refuses a day whose kind is not "test"."""
 
 import re
