@@ -78,6 +78,15 @@ Test days are labelled TEST everywhere, never take customer entries and never ch
 mysql+pymysql://<user>:<password>@<host>:4000/boche?ssl_ca=/etc/ssl/certs/ca-certificates.crt&ssl_verify_cert=true&ssl_verify_identity=true
 ```
 
+### Scheduled pings
+
+Render's free plan sleeps after about 15 idle minutes, and the Draw day steps (seal at 8:00, OTP window from 8:15, publish at 8:30 PM IST) only run when the app gets a request. `POST /api/tick` (GET also works) applies whatever step is due and is safe to call any number of times.
+
+- **GitHub Actions** (`.github/workflows/tick.yml`) pings at 19:55, 20:00, 20:15, 20:30 and 20:35 IST. GitHub can start scheduled runs several minutes late, so the 19:55 run wakes the app early and the extra runs cover delays. Set a repository variable `TICK_URL` to point it at a different host. Scheduled workflows only run from the default branch.
+- **cron-job.org** (more punctual, needs a free account): create jobs that send `POST https://boche.onrender.com/api/tick` daily at 19:58, 20:00, 20:15 and 20:30 Asia/Kolkata, with a 60 s timeout.
+
+Any visit to the site also triggers the due step, so the pings only matter while nobody has the app open.
+
 ## Layout
 
 | Folder | Contents |

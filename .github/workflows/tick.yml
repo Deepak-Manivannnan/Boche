@@ -1,0 +1,21 @@
+# Wakes the Render app and applies due Draw day steps (seal at 8:00, OTP window from 8:15, publish at 8:30 PM IST).
+# GitHub may start scheduled runs a few minutes late, so there is an early wake ping and a repeat after each step.
+name: Draw day ping
+
+on:
+  schedule:
+    - cron: "25,30,45 14 * * *" # 19:55, 20:00, 20:15 IST
+    - cron: "0,5 15 * * *" # 20:30, 20:35 IST
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: POST /api/tick
+        run: curl -fsS -X POST --retry 3 --retry-all-errors --retry-delay 20 --max-time 90 "${TICK_URL:-https://boche.onrender.com/api/tick}"
+        env:
+          TICK_URL: ${{ vars.TICK_URL }}

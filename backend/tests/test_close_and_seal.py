@@ -197,3 +197,14 @@ def test_without_a_github_token_the_day_still_closes_and_waits_to_publish(make_c
 
 def test_an_unknown_day_has_no_ticket_list(make_client):
     assert make_client(None).get("/api/public/days/1999-01-01/tickets.csv").status_code == 404
+
+
+def test_a_scheduler_ping_by_get_seals_once_and_repeat_pings_change_nothing(make_client, seals, db_engine):
+    client = make_client()
+    at(client, 18, 0)
+    entered_numbers(client)
+    at(client, 20, 0, 1)
+    assert client.get("/api/tick").status_code == 200
+    assert client.get("/api/tick").status_code == 200
+    assert day_row(db_engine).status == "sealed"
+    assert seals.calls == 1

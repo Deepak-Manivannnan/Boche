@@ -18,9 +18,9 @@ Db = Annotated[Session, Depends(get_db)]
 Label = Annotated[str, Path(pattern=r"^[A-Za-z0-9-]{1,40}$")]
 
 
-@router.post("/tick")
+@router.api_route("/tick", methods=["GET", "POST"])
 def tick(request: Request) -> dict:
-    """Apply any Draw day step that is due. Called by an external scheduler at 8:00, 8:15 and 8:30 PM IST;
+    """Apply any Draw day step that is due. A scheduler pings it (GET or POST) near 8:00, 8:15, 8:30 PM IST;
     every other API request does the same, so this only matters while the site is otherwise idle."""
     state = request.app.state
     return advance(state.sessionmaker, state.clock.now(), state.seal_publisher)
