@@ -60,37 +60,96 @@
     for (var i = 0; i < 9; i++) h += '<i style="left:' + (6 + i * 10.5) + '%;background:' + cols[i % cols.length] + ';animation-delay:' + (i * 0.12).toFixed(2) + 's;animation-duration:' + (2.6 + (i % 3) * 0.5).toFixed(1) + 's"></i>';
     return '<div class="rv-balloons" aria-hidden="true">' + h + '</div>';
   }
-  /* Synthesised sounds (Web Audio, no files): a soft bell per consolation number, a rising drum tick while
-     a top-three number locks, and a brass-like fanfare for 3rd/2nd, bigger for 1st. Muting is remembered. */
+  /* Sounds. Lucky 7: synthesised bells with a generated hall reverb, and a rising flourish once all seven are in.
+     Top three: recorded public-domain clips in /sfx (drum roll under the spin, cymbal crash on the lock, a brass
+     fanfare, applause; a longer fanfare and cheering for 1st). Clips are fetched once and decoded on first use;
+     if one is missing the synth fanfare plays instead. Muting is remembered. */
   var sfx = (function () {
-    var ctx = null, on = true;
+    var ctx = null, on = true, verb = null, bus = null, bufs = {}, loading = {}, live = [];
     try { on = root.localStorage.getItem('bocheclub-rv-sound') !== 'off'; } catch (e) { on = true; }
     function ac() {
       if (!on) return null;
-      if (!ctx) { var C = root.AudioContext || root.webkitAudioContext; if (!C) return null; try { ctx = new C(); } catch (e) { return null; } }
+      if (!ctx) {
+        var C = root.AudioContext || root.webkitAudioContext; if (!C) return null;
+        try { ctx = new C(); } catch (e) { return null; }
+        bus = ctx.createGain(); bus.gain.value = 0.9; bus.connect(ctx.destination);
+        try {
+          var len = ctx.sampleRate * 2.6, ir = ctx.createBuffer(2, len, ctx.sampleRate);
+          for (var ch = 0; ch < 2; ch++) { var d = ir.getChannelData(ch); for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3); }
+          verb = ctx.createConvolver(); verb.buffer = ir;
+          var wet = ctx.createGain(); wet.gain.value = 0.32; verb.connect(wet); wet.connect(bus);
+        } catch (e) { verb = null; }
+      }
       if (ctx.state === 'suspended' && ctx.resume) ctx.resume();
       return ctx;
     }
+    function out(node) { node.connect(bus); if (verb) node.connect(verb); }
     function tone(f, t0, dur, type, vol) {
       var c = ac(); if (!c) return;
       var o = c.createOscillator(), g = c.createGain(), t = c.currentTime + t0;
       o.type = type || 'sine'; o.frequency.value = f;
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol || 0.15, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + 0.05);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol || 0.15, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); out(g); o.start(t); o.stop(t + dur + 0.05);
     }
+    /* A bell: fundamental plus inharmonic partials that die away faster. */
+    function bell(f, t0, vol) {
+      tone(f, t0, 1.6, 'sine', vol); tone(f * 2.01, t0, 0.9, 'sine', vol * 0.35);
+      tone(f * 2.76, t0, 0.6, 'sine', vol * 0.18); tone(f * 5.4, t0, 0.25, 'sine', vol * 0.08);
+    }
+    function load(name) {
+      var c = ac(); if (!c || bufs[name] || loading[name] || !root.fetch) return;
+      loading[name] = true;
+      root.fetch('/sfx/' + name + '.mp3').then(function (r) { if (!r.ok) throw 0; return r.arrayBuffer(); })
+        .then(function (a) { return new Promise(function (ok, no) { c.decodeAudioData(a, ok, no); }); })
+        .then(function (b) { bufs[name] = b; }, function () { loading[name] = false; });
+    }
+    /* Plays a clip; returns false if it is not loaded yet. fadeIn ramps it up (used for the drum roll). */
+    function clip(name, vol, fadeIn) {
+      var c = ac(); if (!c || !bufs[name]) return false;
+      var s = c.createBufferSource(), g = c.createGain(), t = c.currentTime;
+      s.buffer = bufs[name];
+      if (fadeIn) { g.gain.setValueAtTime(vol * 0.25, t); g.gain.linearRampToValueAtTime(vol, t + fadeIn); } else g.gain.value = vol;
+      s.connect(g); g.connect(bus); s.start(t);
+      var item = { s: s, g: g }; live.push(item);
+      s.onended = function () { live = live.filter(function (x) { return x !== item; }); };
+      return item;
+    }
+    function fade(item, sec) {
+      if (!item || !ctx) return;
+      var t = ctx.currentTime; item.g.gain.cancelScheduledValues(t); item.g.gain.setValueAtTime(item.g.gain.value, t);
+      item.g.gain.linearRampToValueAtTime(0.0001, t + sec); try { item.s.stop(t + sec + 0.05); } catch (e) {}
+    }
+    function synthFanfare(grand) {
+      var run = grand ? [392, 523, 659, 784, 1047] : [523, 659, 784];
+      run.forEach(function (f, i) { tone(f, i * 0.11, 0.5, 'sawtooth', 0.05); tone(f, i * 0.11, 0.5, 'triangle', 0.12); });
+      var at = run.length * 0.11, hold = grand ? 2.2 : 1.3;
+      [523, 659, 784, 1047].concat(grand ? [1319] : []).forEach(function (f) { tone(f, at, hold, 'triangle', 0.1); tone(f, at, hold, 'sawtooth', 0.025); });
+      tone(131, at, hold, 'sine', 0.18);
+    }
+    var drum = null, run = 0;
     return {
       isOn: function () { return on; },
-      toggle: function () { on = !on; try { root.localStorage.setItem('bocheclub-rv-sound', on ? 'on' : 'off'); } catch (e) {} return on; },
-      tick: function (k) { tone(160 + k * 22, 0, 0.07, 'triangle', 0.09); },
-      ding: function (k) { var f = [784, 880, 988, 1047, 1175, 1319, 1568][k % 7]; tone(f, 0, 0.6, 'sine', 0.16); tone(f * 2, 0, 0.3, 'sine', 0.04); },
+      toggle: function () { on = !on; try { root.localStorage.setItem('bocheclub-rv-sound', on ? 'on' : 'off'); } catch (e) {} if (!on) this.stop(); return on; },
+      /* Start fetching the clips early (called when the reveal opens), so they are ready by the top three. */
+      preload: function () { ['roll', 'crash', 'fanfare', 'fanfare-grand', 'applause', 'cheer'].forEach(load); },
+      ding: function (k) { bell([784, 880, 988, 1047, 1175, 1319, 1568][k % 7], 0, 0.14); },
+      /* Seven stubs filled: a quick rising arpeggio and a shimmer. */
+      flourish: function () {
+        [523, 659, 784, 1047, 1319].forEach(function (f, i) { bell(f, i * 0.09, 0.09); });
+        for (var k = 0; k < 8; k++) tone(2093 + Math.random() * 1500, 0.5 + k * 0.07, 0.3, 'sine', 0.03);
+      },
+      /* Drum roll under a top-three spin; falls back to synth ticks per locked character if not loaded. */
+      rollStart: function () { this.rollStop(0); drum = clip('roll', 0.8, 3); },
+      tick: function (k) { if (!drum) tone(160 + k * 22, 0, 0.07, 'triangle', 0.09); },
+      rollStop: function (sec) { if (drum) fade(drum, sec == null ? 0.15 : sec); drum = null; },
       fanfare: function (grand) {
-        var run = grand ? [392, 523, 659, 784, 1047] : [523, 659, 784];
-        run.forEach(function (f, i) { tone(f, i * 0.11, 0.5, 'sawtooth', 0.05); tone(f, i * 0.11, 0.5, 'triangle', 0.12); });
-        var at = run.length * 0.11, hold = grand ? 2.2 : 1.3;
-        [523, 659, 784, 1047].concat(grand ? [1319] : []).forEach(function (f) { tone(f, at, hold, 'triangle', 0.1); tone(f, at, hold, 'sawtooth', 0.025); });
-        tone(131, at, hold, 'sine', 0.18);
-        if (grand) for (var k = 0; k < 10; k++) tone(1568 + Math.random() * 1400, at + 0.25 + k * 0.12, 0.25, 'sine', 0.05);
-      }
+        this.rollStop(0.12);
+        clip('crash', grand ? 0.9 : 0.7);
+        if (!clip(grand ? 'fanfare-grand' : 'fanfare', grand ? 0.95 : 0.85)) synthFanfare(grand);
+        var gen = run; setTimeout(function () { if (on && gen === run) clip(grand ? 'cheer' : 'applause', grand ? 0.55 : 0.45); }, grand ? 1800 : 900);
+      },
+      busy: function () { return live.length > 0; },
+      stop: function () { run++; drum = null; live.slice().forEach(function (x) { fade(x, 0.4); }); }
     };
   })();
 
@@ -112,14 +171,14 @@
     el.innerHTML = (reduced ? '' : '<div class="rv-rays" aria-hidden="true"></div>' + sparkles() + matrix()) +
       '<div class="rv-fx" id="rvFx"></div><div class="rv-ladder" id="rvLadder"></div><div class="rv-body" id="rvBody"></div>' +
       '<button class="rv-snd" type="button" aria-label="Sound">' + (sfx.isOn() ? '♪ On' : '♪ Off') + '</button><button class="rv-skip" type="button">Skip</button>';
-    host.appendChild(el);
+    host.appendChild(el); sfx.preload();
     var body = el.querySelector('#rvBody'), fx = el.querySelector('#rvFx'), ladderEl = el.querySelector('#rvLadder');
-    el.querySelector('.rv-skip').addEventListener('click', function () { finale(); });
+    el.querySelector('.rv-skip').addEventListener('click', function () { sfx.stop(); finale(); });
     el.querySelector('.rv-snd').addEventListener('click', function (e) { e.currentTarget.textContent = sfx.toggle() ? '♪ On' : '♪ Off'; });
 
     function later(fn, ms) { var t = setTimeout(fn, reduced ? Math.min(ms, 60) : ms); timers.push(t); return t; }
     function clear() { timers.forEach(function (t) { clearTimeout(t); clearInterval(t); }); timers = []; }
-    function stop() { if (stopped) return; stopped = true; clear(); el.classList.add('out'); setTimeout(function () { el.remove(); }, 300); if (opts.onDone) opts.onDone(); }
+    function stop() { if (stopped) return; stopped = true; clear(); sfx.stop(); el.classList.add('out'); setTimeout(function () { el.remove(); }, 300); if (opts.onDone) opts.onDone(); }
     function mode(cls) { el.classList.remove('rolling', 'tense', 'dim', 'rv-me'); if (cls) cls.split(' ').forEach(function (c) { el.classList.add(c); }); }
 
     /* Ten places from 10th up to 1st; done ones light up, the current one pulses. */
@@ -160,7 +219,7 @@
         if (k >= list.length) {
           var me = list.some(function (x) { return x.mine; });
           if (me) { el.classList.add('rv-me'); if (opts.chime) opts.chime(); fx.innerHTML = reduced ? '' : (opts.confetti ? opts.confetti() : ''); }
-          place.textContent = ''; no.innerHTML = ''; no.className = 'rv-no sm idle'; who.textContent = 'Seven lucky numbers drawn';
+          place.textContent = ''; no.innerHTML = ''; no.className = 'rv-no sm idle'; who.textContent = 'Seven lucky numbers drawn'; sfx.flourish();
           later(function () { fx.innerHTML = ''; i = list.length - 1; next(); }, 1600);
           return;
         }
@@ -215,6 +274,7 @@
       var no = body.querySelector('#rvNo'), locked = 0, chars = w.ticket.replace(/ /g, '').length, n = 0;
       var base = w.rank === 1 ? 330 : w.big ? 240 : 105;
       mode('rolling' + (w.big ? ' tense' : ''));
+      if (w.big) sfx.rollStart();
       var flick = setInterval(function () { no.innerHTML = cells(scrambleFrame(w.ticket, locked, Math.random()), locked); }, 50);
       timers.push(flick);
       (function lockNext() {
@@ -258,7 +318,7 @@
         '<button class="btn btn-gold mt16 rv-close" type="button">See all winners</button>' +
         (opts.verifyHref ? '<a class="rv-verify" href="' + esc(opts.verifyHref) + '">Verify this draw</a>' : '');
       fx.innerHTML = o.won ? balloons() + (opts.confetti ? opts.confetti() : '') : '';
-      if (o.won) { sfx.fanfare(true); if (opts.chime) opts.chime(); }
+      if (o.won) { if (!sfx.busy()) sfx.fanfare(true); if (opts.chime) opts.chime(); }
       body.querySelector('.rv-close').addEventListener('click', stop);
       var v = body.querySelector('.rv-verify'); if (v) v.addEventListener('click', stop);
       el.querySelector('.rv-skip').style.display = 'none'; el.querySelector('.rv-snd').style.display = 'none';
