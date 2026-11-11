@@ -1820,7 +1820,7 @@
       '<button class="btn btn-gold mt16" data-otp-btn data-act="admRun" disabled>' + ic('sparkle', 16) + 'Run the draw</button>' +
       '<p class="fine center mt12">Code sent · valid until ' + istTime(d.otpExpiresAt) + ' · <a class="link" href="javascript:void(0)" data-act="admSendOtp">Send a new code</a></p>';
     else body = '<div class="field-l">Winners · drawn at ' + istTime(d.drawnAt, true) + '</div><div class="list">' + (d.winners || []).map(function (x) {
-        return '<div class="li win"><div class="li-main"><div class="li-t">' + prizeLabel(x.rank) + '</div><div class="li-s">#' + x.rank + ' · position ' + x.position + ' in the list</div></div><div class="win-r"><span class="lno">' + esc(x.ticket) + '</span></div></div>';
+        return '<div class="li win"><div class="li-main"><div class="li-t">' + x.rank + ({ 1: 'st', 2: 'nd', 3: 'rd' }[x.rank] || 'th') + ' prize</div><div class="li-s">Position ' + x.position + ' in the list</div></div><div class="win-r"><span class="lno">' + esc(x.ticket) + '</span></div></div>';
       }).join('') + '</div><p class="fine center mt12">Results go public at ' + istTime(d.publishNotBefore) + '.</p>';
     return head + '<div class="pad"><div class="field-l" style="margin-top:16px">Draw day</div><div class="chips scroll-x">' + A.days.map(function (x) {
         return '<button class="chip' + (x.label === A.sel ? ' on' : '') + '" data-act="admPick" data-id="' + esc(x.label) + '">' + esc(x.label) + (x.kind === 'test' ? ' · TEST' : '') + '</button>';
