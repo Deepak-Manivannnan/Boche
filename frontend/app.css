@@ -1657,4 +1657,6 @@ a.link, a.btn { text-decoration: none; }
 .wl-p.gold { color: #4A3408; background: radial-gradient(circle at 32% 28%, #FFF4CF 0 12%, #E8C873 34%, #C9A04A 62%, #8C6420 100%); box-shadow: 0 0 0 1.5px #8C6420, 0 2px 4px rgba(94,66,20,.28), inset 0 -2px 3px rgba(94,66,20,.35); }
 .wl-p.silver { color: #30343A; background: radial-gradient(circle at 32% 28%, #FFFFFF 0 12%, #E3E5E8 34%, #B9BEC4 62%, #7E848C 100%); box-shadow: 0 0 0 1.5px #7E848C, 0 2px 4px rgba(46,50,56,.22), inset 0 -2px 3px rgba(46,50,56,.3); }
 .wl-p.bronze { color: #3F230D; background: radial-gradient(circle at 32% 28%, #FBE1C6 0 12%, #DDA575 34%, #B87843 62%, #7E4A20 100%); box-shadow: 0 0 0 1.5px #7E4A20, 0 2px 4px rgba(63,35,13,.26), inset 0 -2px 3px rgba(63,35,13,.32); }
-.wl-c { grid-column: 2 / -1; justify-self: end; margin-top: -2px; }
+.won-card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 10px; border-radius: 16px; background: linear-gradient(135deg, #FBF1D6, #F3E2B4); border: 1px solid #E2C77E; }
+.won-card .wc-ic { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: #4A3408; background: radial-gradient(circle at 32% 28%, #FFF4CF 0 12%, #E8C873 40%, #B8892E 100%); box-shadow: 0 0 0 1.5px #8C6420; flex: none; }
+.won-card .wc-t { font-family: var(--serif); font-size: 17px; font-weight: 700; color: var(--ink); }

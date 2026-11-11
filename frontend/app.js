@@ -176,8 +176,9 @@
   /* Every inner page: back on the left; on the right a ⋮ menu with options that suit the page, and the member's avatar (name, tier, quick links) */
   var HELP = ['support', 'headset', 'Help & support'], SHOP = ['tea', 'leaf', 'Shop tea'], ORDERS = ['tea-orders', 'receipt', 'My orders'], NUMS = ['my-numbers', 'gift', 'My lucky numbers'], WINS = ['my-wins', 'crown', 'My wins'],
     DRAW = ['draw', 'crown', 'Lucky Draw'], OFFERS = ['offers', 'tag', 'Offers & events'], TIERS = ['tiers', 'crown', 'Membership tiers'], VENUES = ['explore', 'pin', 'All venues'], ADDRS = ['addresses', 'pin', 'Delivery addresses'], ACT = ['activity', 'receipt', 'Activity'];
+  var LUCKY = [DRAW, NUMS, WINS, ORDERS, SHOP, HELP];
   var PAGE_MENU = {
-    tea: [ORDERS, NUMS, WINS, ADDRS], 'tea-orders': [SHOP, NUMS, WINS, HELP], 'my-numbers': [SHOP, ORDERS, WINS], draw: [WINS, ORDERS, NUMS, HELP], 'my-wins': [NUMS, ORDERS, DRAW, HELP],
+    tea: LUCKY, 'tea-orders': LUCKY, 'my-numbers': LUCKY, draw: LUCKY, 'my-wins': LUCKY,
     'tea-address': [ORDERS, HELP], 'tea-pay': [ORDERS, HELP], addresses: [ORDERS, HELP], address: [ORDERS, HELP],
     explore: [OFFERS, TIERS, HELP], card: [TIERS, OFFERS, HELP], biz: [OFFERS, VENUES, TIERS, HELP], outlet: [OFFERS, VENUES, HELP], book: [VENUES, HELP],
     support: [['grievance', 'clip', 'Raise a complaint'], ['card', 'card', 'My card'], ACT], grievance: [HELP, ACT], ticket: [HELP, ACT],
@@ -1435,18 +1436,26 @@
     var nosFor = function (pred) { return mine.filter(pred).reduce(function (t, c) { return t.concat(c.nos); }, []); };
     var todayNos = nosFor(function (c) { return c.submitted && c.drawDate === today; });
     var nextNos = nosFor(function (c) { return c.submitted && c.drawDate > today; });
-    function winners(list, claim) {
+    function winners(list) {
       return '<div class="wl">' + list.map(function (w) {
         var me = w.member === BC_MEMBER.id, ord = w.place + ({ 1: 'st', 2: 'nd', 3: 'rd' }[w.place] || 'th');
         var medal = { 1: ' gold', 2: ' silver', 3: ' bronze' }[w.place] || '';
-        var act = me && claim && w.card ? (w.card.claimed ? '<span class="badge plain">Claimed</span>' : '<button class="btn btn-sm btn-gold" data-act="claimPrize" data-id="' + esc(w.card.id) + '">Claim</button>') : '';
         return '<div class="wl-r' + (me ? ' me' : '') + '"><span class="wl-p' + medal + '" aria-label="' + ord + ' prize">' + ord + '</span>' +
           '<span class="wl-n">' + esc(w.name) + (me ? ' <span class="badge ok">You</span>' : '') + '</span>' +
-          '<span class="lno wl-t">' + esc(w.no) + '</span><b class="wl-a">' + inr(w.amount) + '</b>' + (act ? '<span class="wl-c">' + act + '</span>' : '') + '</div>';
+          '<span class="lno wl-t">' + esc(w.no) + '</span><b class="wl-a">' + inr(w.amount) + '</b>' + '</div>';
       }).join('') + '</div>';
     }
     /* Today's winners are listed above, so the calendar covers the 30 days before today. Nothing is selected
        until a day is tapped; tapping it again closes its list. */
+    /* Shown only if you won today: your total and a Claim button that opens My wins */
+    function wonCard(list) {
+      var mineW = list.filter(function (w) { return w.member === BC_MEMBER.id; }); if (!mineW.length) return '';
+      var total = mineW.reduce(function (t, w) { return t + w.amount; }, 0);
+      var open = mineW.some(function (w) { return !(w.card && w.card.claimed); });
+      return '<div class="won-card"><span class="wc-ic">' + ic('crown', 20) + '</span><div class="li-main"><div class="wc-t">You won ' + inr(total) + ' today</div>' +
+        '<div class="li-s">' + (mineW.length > 1 ? mineW.length + ' winning numbers' : '1 winning number') + '</div></div>' +
+        (open ? '<button class="btn btn-sm btn-gold" data-go="my-wins">Claim</button>' : '<span class="badge ok">Claimed</span>') + '</div>';
+    }
     var DAYS = 30, sel = ui.drawSel && ui.drawSel < today && ui.drawSel >= dayShift(today, -DAYS) ? ui.drawSel : null;
     var first = dayShift(today, -DAYS), lead = (new Date(first + 'T12:00:00').getDay() + 6) % 7, cells = '', MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     for (var e = 0; e < lead; e++) cells += '<span class="cal-c empty"></span>';
@@ -1469,7 +1478,7 @@
         return '<button class="alert alert-btn" data-go="scratch/' + c.id + '">' + ic('sparkle', 18) + '<span>' + (c.scratched ? 'Enter your ' + numsLabel(c.nos.length) : 'Scratch card to open · ' + numsLabel(c.nos.length)) + '</span>' + ic('chev', 16) + '</button>';
       }).join('') : '') +
       '<div class="sec-h" style="padding:0;margin-top:22px"><h3>Today · ' + esc(new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })) + '</h3></div>' +
-      (res ? winners(res, true) + verifyLink(today)
+      (res ? wonCard(res) + winners(res) + verifyLink(today)
         : '<div class="surface draw-wait"><div class="dw-k" id="drawCdK">Results in</div><div class="dw-v" id="drawCd"></div>' +
           '<div class="li-s">' + (todayNos.length ? 'Your ' + (todayNos.length > 1 ? todayNos.length + ' numbers' : 'number') + ' in today’s draw' : 'No entries from you yet. Order tea to get a scratch card.') + '</div>' +
           (todayNos.length ? '<div class="chips mt8">' + todayNos.map(function (no) { return '<span class="lno big">' + esc(no) + '</span>'; }).join('') + '</div>' : '') +
