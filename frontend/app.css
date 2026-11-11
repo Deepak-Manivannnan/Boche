@@ -1608,3 +1608,5 @@ a.hm-cta, .hm-cta { min-height: 30px; }
 .rv-balloons i::after { content: ''; position: absolute; left: 50%; top: 100%; width: 1px; height: 40px; background: rgba(243, 230, 196, .5); }
 @keyframes rv-float { to { transform: translateY(-760px) translateX(14px); } }
 @media (prefers-reduced-motion: reduce) { .rv, .rv-count, .rv-place, .rv-no, .rv-no.done, .rv-balloons i, .rv-matrix i, .rv-rays, .rv-sparkle i, .rv-ladder i, .rv-burst b { animation: none; } }
+/* A button whose request is still running (api.js) */
+.btn.is-busy, button.is-busy { opacity: .55; pointer-events: none; cursor: progress; }

@@ -4,6 +4,31 @@
 var BCAPI = (function () {
   'use strict';
 
+  /* The button that started a request stays disabled until the server answers, so a second tap
+     can't send the same action twice. An identical POST already in flight is reused, not repeated. */
+  var lastBtn = null, lastAt = 0, inFlight = {};
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('button, .btn');
+    if (b) { lastBtn = b; lastAt = Date.now(); }
+  }, true);
+  function busy(btn, on) {
+    if (!btn) return;
+    if (btn.tagName === 'BUTTON') btn.disabled = on;
+    btn.classList.toggle('is-busy', on);
+    if (on) btn.setAttribute('aria-busy', 'true'); else btn.removeAttribute('aria-busy');
+  }
+  function guarded(method, path, body) {
+    var key = method + ' ' + path + ' ' + JSON.stringify(body);
+    if (inFlight[key]) return inFlight[key];
+    var btn = lastBtn && Date.now() - lastAt < 1000 && !lastBtn.disabled ? lastBtn : null;
+    lastBtn = null;
+    busy(btn, true);
+    function done() { delete inFlight[key]; if (btn && btn.isConnected) busy(btn, false); }
+    var p = inFlight[key] = request(method, path, body);
+    p.then(done, done);
+    return p;
+  }
+
   function request(method, path, body) {
     var opts = { method: method, credentials: 'same-origin', headers: { 'Accept': 'application/json' } };
     if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
@@ -26,6 +51,6 @@ var BCAPI = (function () {
 
   return {
     get: function (path) { return request('GET', path); },
-    post: function (path, body) { return request('POST', path, body === undefined ? {} : body); }
+    post: function (path, body) { return guarded('POST', path, body === undefined ? {} : body); }
   };
 })();

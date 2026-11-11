@@ -108,10 +108,7 @@ def send_founder_otp(label: Label, request: Request, db: Db) -> dict:
         )
     except OtpRefused as e:
         raise HTTPException(status_code=e.status, detail=e.detail) from e
-    sent = {"sent": True, "expiresAt": _iso(challenge.expires_at)}
-    if day.kind == "test":  # Test days only: show the code so a demo works without the Founder's phone
-        sent["testCode"] = challenge.plain_code
-    return sent
+    return {"sent": True, "expiresAt": _iso(challenge.expires_at)}  # the code only goes to the Founder
 
 
 @router.post("/draw-days/{label}/run")

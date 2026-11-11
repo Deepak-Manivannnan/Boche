@@ -1807,7 +1807,6 @@
       '<p class="fine center">The founder gets a 4-digit code by SMS. It runs this draw only, on the sealed list and the drand round above.</p>';
     else if (d.status === 'sealed') body = '<div class="field-l">Founder’s OTP</div><div class="otp" id="otp">' + otpBoxes(4) + '</div><div class="err-text" id="otpErr"></div>' +
       '<button class="btn btn-gold mt16" data-otp-btn data-act="admRun" disabled>' + ic('sparkle', 16) + 'Run the draw</button>' +
-      (d.kind === 'test' && A.testCodes && A.testCodes[d.label] ? '<div class="demo-hint">TEST day code: <b>' + esc(A.testCodes[d.label]) + '</b></div>' : '') +
       '<p class="fine center mt12">Code sent · valid until ' + istTime(d.otpExpiresAt) + ' · <a class="link" href="javascript:void(0)" data-act="admSendOtp">Send a new code</a></p>';
     else body = '<div class="field-l">Winners · drawn at ' + istTime(d.drawnAt, true) + '</div><div class="list">' + (d.winners || []).map(function (x) {
         return '<div class="li win"><div class="li-main"><div class="li-t">' + prizeLabel(x.rank) + '</div><div class="li-s">#' + x.rank + ' · position ' + x.position + ' in the list</div></div><div class="win-r"><span class="lno">' + esc(x.ticket) + '</span></div></div>';
@@ -1822,7 +1821,7 @@
       '<div class="kv"><span>Seal</span><span>' + (d.sealUrl ? '<a class="link" href="' + esc(d.sealUrl) + '" target="_blank" rel="noopener">On GitHub</a>' : d.fingerprint ? 'Publishing to GitHub…' : '—') + '</span></div>' +
       '<div class="kv"><span>Randomness</span><span>' + (d.drandRound ? 'drand round ' + d.drandRound + ' · ' + istTime(d.roundReleasedAt, true) : '—') + '</span></div></div>' +
       body + (d.status === 'published' ? '<div class="btn-row mt12"><button class="btn btn-line btn-sm" data-act="admReveal">' + ic('sparkle', 15) + 'Preview the reveal</button>' + verifyLink(d.label, true) + '</div>' : '') +
-      '<p class="fine center mt16">There is no way to redraw or change winners. Running again returns the saved result.</p>' + testPanel + '</div>';
+      testPanel + '</div>';
   };
   AFTER['admin-draw'] = function () {
     if (!ui.adm || !ui.adm.days || Date.now() - ui.adm.loadedAt > 10000) admLoad();
@@ -1973,14 +1972,13 @@
       var d = admDay(); if (!d || ui.adm.busy) return;
       ui.adm.busy = true;
       BCAPI.post('/admin/draw-days/' + encodeURIComponent(d.label) + '/otp').then(function (r) {
-        if (r.testCode) { ui.adm.testCodes = ui.adm.testCodes || {}; ui.adm.testCodes[d.label] = r.testCode; }
         ui.adm.busy = false; toast('OTP sent to the founder'); return admLoad().then(rerender);
       }, function (e) { ui.adm.busy = false; toast(e.message || 'Could not send the OTP'); });
     },
     admRun: function () {
       var d = admDay(); if (!d || ui.adm.busy || !$('otp')) return;
       var code = Array.prototype.map.call($('otp').querySelectorAll('input'), function (x) { return x.value; }).join('');
-      if (!/^\d{6}$/.test(code)) return;
+      if (!/^\d{4}$/.test(code)) return;
       ui.adm.busy = true;
       BCAPI.post('/admin/draw-days/' + encodeURIComponent(d.label) + '/run', { code: code }).then(function (day) {
         ui.adm.busy = false;

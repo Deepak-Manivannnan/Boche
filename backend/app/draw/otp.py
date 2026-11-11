@@ -154,7 +154,6 @@ def request_otp(
         db.delete(challenge)
         db.commit()
         raise OtpRefused(502, "The OTP SMS could not be sent. Try again in a moment.") from e
-    challenge.plain_code = code  # in memory only, never stored
     return challenge
 
 

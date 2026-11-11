@@ -120,8 +120,8 @@ def test_a_full_test_day_runs_end_to_end_and_passes_the_verifier(t, tmp_path):
 
     after_round(t, day)
     sent = t.admin.post(f"/api/admin/draw-days/{label}/otp").json()
-    assert sent["testCode"] == t.state.otp_sender.code  # shown on screen for test days only
-    run = t.admin.post(f"/api/admin/draw-days/{label}/run", json={"code": sent["testCode"]}).json()
+    assert "testCode" not in sent  # the code only reaches the Founder's phone, even on test days
+    run = t.admin.post(f"/api/admin/draw-days/{label}/run", json={"code": t.state.otp_sender.code}).json()
     assert run["status"] == "published"  # publish gap 0: visible straight after the draw
 
     for name in ("tickets.csv", "seal.json", "result.json"):
@@ -137,7 +137,8 @@ def test_a_publish_gap_holds_the_result_back(t):
     seed(t, label, 50)
     day = close(t, label, gap=10)
     after_round(t, day)
-    code = t.admin.post(f"/api/admin/draw-days/{label}/otp").json()["testCode"]
+    t.admin.post(f"/api/admin/draw-days/{label}/otp")
+    code = t.state.otp_sender.code
     assert t.admin.post(f"/api/admin/draw-days/{label}/run", json={"code": code}).json()["status"] == "drawn"
     assert t.admin.get(f"/api/public/days/{label}/result.json").status_code == 404
 
