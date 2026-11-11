@@ -143,37 +143,53 @@
       announce(w);
     }
 
-    /* Lucky 7: a board of seven rows (10th at the top, 4th at the bottom). One row at a time lights up,
-       rolls for about a second and locks with a bell, then the next row starts. ~7 s in all. */
+    /* Lucky 7: the same stage as the top three, only quicker. Each number rolls in the centre, locks with a
+       bell, then drops into its stub in the tray below (10th to 4th), so the tray fills as the wait goes on. */
     function consolation() {
       var list = p.order.filter(function (w) { return !w.big; });
       if (!list.length) { next(); return; }
       mode(''); ladder(0);
-      body.innerHTML = '<div class="rv-k">Lucky 7 · consolation prizes</div><div class="rv-prize">' + inr(list[0].amount) + ' each</div>' +
-        '<div class="rv-board">' + list.map(function (w, k) {
-          return '<div class="rv-row7" id="rvG' + k + '"><span class="rv-pl">' + ordinal(w.rank) + '</span>' +
-            '<span class="rv-tk">' + esc(w.ticket.replace(/[A-Z0-9]/g, '•')) + '</span><span class="rv-nm"></span></div>';
+      body.innerHTML = '<div class="rv-k">Lucky 7 · ' + inr(list[0].amount) + ' each</div>' +
+        '<div class="rv7-stage"><div class="rv-place sm" id="rv7P"></div>' +
+        '<div class="rv-no sm" id="rv7N"></div><div class="rv-who sm" id="rv7W"></div></div>' +
+        '<div class="rv7-tray">' + list.map(function (w, k) {
+          return '<div class="rv7-stub" id="rv7S' + k + '"><span class="rv7-pl">' + ordinal(w.rank) + '</span><b class="rv7-tk"></b><span class="rv7-nm"></span></div>';
         }).join('') + '</div>';
+      var place = body.querySelector('#rv7P'), no = body.querySelector('#rv7N'), who = body.querySelector('#rv7W');
       (function step(k) {
         if (k >= list.length) {
           var me = list.some(function (x) { return x.mine; });
           if (me) { el.classList.add('rv-me'); if (opts.chime) opts.chime(); fx.innerHTML = reduced ? '' : (opts.confetti ? opts.confetti() : ''); }
-          later(function () { fx.innerHTML = ''; i = list.length - 1; next(); }, 1800);
+          place.textContent = ''; no.innerHTML = ''; no.className = 'rv-no sm idle'; who.textContent = 'Seven lucky numbers drawn';
+          later(function () { fx.innerHTML = ''; i = list.length - 1; next(); }, 1600);
           return;
         }
-        var w = list[k], row = body.querySelector('#rvG' + k), tk = row.querySelector('.rv-tk');
-        row.classList.add('live'); mode('rolling');
-        var flick = setInterval(function () { tk.textContent = scrambleFrame(w.ticket, 0, Math.random()); }, 55);
+        var w = list[k], stub = body.querySelector('#rv7S' + k), locked = 0;
+        stub.classList.add('now');
+        place.textContent = ordinal(w.rank); place.style.animation = 'none'; void place.offsetWidth; place.style.animation = '';
+        no.className = 'rv-no sm'; who.textContent = 'Drawing…';
+        mode('rolling');
+        var flick = setInterval(function () { no.innerHTML = cells(scrambleFrame(w.ticket, locked, Math.random()), locked); }, 45);
         timers.push(flick);
-        later(function () {
-          clearInterval(flick); mode('');
-          tk.textContent = w.ticket;
-          row.classList.remove('live'); row.classList.add('done');
-          var nm = row.querySelector('.rv-nm');
-          if (w.mine) { row.classList.add('mine'); nm.innerHTML = '<b>You!</b>'; } else nm.textContent = w.name || '';
-          ladder(k + 1); sfx.ding(k);
-          later(function () { step(k + 1); }, 260);
-        }, 750);
+        (function lockNext() {
+          later(function () {
+            locked++;
+            while (locked < w.ticket.length && w.ticket[locked] === ' ') locked++;
+            no.innerHTML = cells(scrambleFrame(w.ticket, locked, Math.random()), locked);
+            if (locked < w.ticket.length) { lockNext(); return; }
+            clearInterval(flick); mode('');
+            no.innerHTML = cells(w.ticket, w.ticket.length); no.className = 'rv-no sm done';
+            who.innerHTML = w.mine ? '<b class="rv-you">That’s you!</b>' : esc(w.name || '');
+            sfx.ding(k);
+            later(function () {
+              stub.classList.remove('now'); stub.classList.add('in'); if (w.mine) stub.classList.add('mine');
+              stub.querySelector('.rv7-tk').textContent = w.ticket;
+              stub.querySelector('.rv7-nm').textContent = w.mine ? 'You!' : (w.name || '');
+              ladder(k + 1);
+              later(function () { step(k + 1); }, 250);
+            }, 650);
+          }, locked === 0 ? 350 : 75);
+        })();
       })(0);
     }
 

@@ -1610,19 +1610,29 @@ a.hm-cta, .hm-cta { min-height: 30px; }
 @media (prefers-reduced-motion: reduce) { .rv, .rv-count, .rv-place, .rv-no, .rv-no.done, .rv-balloons i, .rv-matrix i, .rv-rays, .rv-sparkle i, .rv-ladder i, .rv-burst b { animation: none; } }
 /* A button whose request is still running (api.js) */
 .btn.is-busy, button.is-busy { opacity: .55; pointer-events: none; cursor: progress; }
-/* Reveal: the Lucky 7 board, the sound toggle; links never underlined */
-.rv-board { max-width: 330px; margin: 0 auto; border-radius: var(--r-md); border: 1px solid rgba(217, 180, 90, .3); background: rgba(0, 0, 0, .28); overflow: hidden; }
-.rv-row7 { display: grid; grid-template-columns: 44px auto 1fr; align-items: center; column-gap: 12px; padding: 9px 14px; border-top: 1px solid rgba(217, 180, 90, .12); text-align: left; transition: background .25s; }
-.rv-row7:first-child { border-top: 0; }
-.rv-pl { font: 700 13px var(--font); color: rgba(243, 230, 196, .45); }
-.rv-tk { font: 700 19px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .06em; color: rgba(243, 230, 196, .28); white-space: pre; }
-.rv-nm { min-width: 0; font-size: 12.5px; color: rgba(243, 230, 196, .75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
-.rv-row7.live { background: rgba(217, 180, 90, .14); }
-.rv-row7.live .rv-tk { color: #fff; text-shadow: 0 0 10px rgba(217, 180, 90, .7); }
-.rv-row7.live .rv-pl, .rv-row7.done .rv-pl { color: var(--gold-l); }
-.rv-row7.done .rv-tk { color: var(--gold-xl); animation: rv-hit .4s ease-out; }
-.rv-row7.mine { background: rgba(217, 180, 90, .22); box-shadow: inset 3px 0 0 var(--gold-l); }
-.rv-row7.mine .rv-nm b { color: #fff; font-size: 13.5px; }
+/* Reveal: Lucky 7 (centre stage + tray of ticket stubs), the sound toggle; links never underlined */
+.rv7-stage { margin: 8px 0 18px; min-height: 150px; }
+.rv-place.sm { font-size: 46px; margin: 6px 0 12px; min-height: 46px; }
+.rv-no.sm { padding: 10px 6px; gap: 3px; min-height: 52px; }
+.rv-no.sm span { width: 24px; padding: 6px 0; font-size: 23px; }
+.rv-no.sm s { width: 8px; }
+.rv-no.idle { border-color: transparent; background: none; }
+.rv-who.sm { margin-top: 10px; font-size: 14px; }
+.rv7-tray { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; max-width: 340px; margin: 0 auto; }
+.rv7-stub { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 6px 10px 6px 12px; border-radius: 8px; text-align: left;
+  border: 1px dashed rgba(217, 180, 90, .3); background: rgba(0, 0, 0, .2); min-height: 48px; transition: border-color .3s, background .3s; }
+.rv7-stub:last-child { grid-column: 1 / -1; justify-self: center; width: calc(50% - 3px); }
+.rv7-stub::before, .rv7-stub::after { content: ""; position: absolute; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; background: #1d150b; }
+.rv7-stub::before { left: -4px; } .rv7-stub::after { right: -4px; }
+.rv7-pl { font: 700 11px var(--font); letter-spacing: .08em; color: rgba(243, 230, 196, .45); }
+.rv7-tk { font: 700 15px/1.2 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .04em; color: var(--gold-xl); min-height: 18px; }
+.rv7-nm { font-size: 11px; color: rgba(243, 230, 196, .7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; min-height: 13px; }
+.rv7-stub.now { border-style: solid; border-color: var(--gold-l); animation: rv-now 1s ease-in-out infinite; }
+.rv7-stub.now .rv7-pl, .rv7-stub.in .rv7-pl { color: var(--gold-l); }
+.rv7-stub.in { border-style: solid; border-color: rgba(217, 180, 90, .55); background: linear-gradient(135deg, rgba(217, 180, 90, .2), rgba(217, 180, 90, .06)); animation: rv7-drop .45s cubic-bezier(.2, 1.4, .4, 1); }
+.rv7-stub.mine { border-color: #fff; box-shadow: 0 0 16px rgba(217, 180, 90, .6); }
+.rv7-stub.mine .rv7-nm { color: #fff; font-weight: 700; }
+@keyframes rv7-drop { from { transform: translateY(-26px) scale(1.12); opacity: .2; } }
 .rv-snd { position: absolute; top: 14px; right: 84px; z-index: 5; background: rgba(0, 0, 0, .3); color: var(--gold-xl); border: 1px solid rgba(217, 180, 90, .4); border-radius: 999px; padding: 6px 12px; font: 600 13px var(--font); cursor: pointer; }
 .rv-ladder { right: 150px; }
 a.link, a.btn { text-decoration: none; }
