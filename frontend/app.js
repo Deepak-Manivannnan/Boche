@@ -2455,7 +2455,9 @@
   document.addEventListener('wheel', function (e) {
     var row = e.target.closest && e.target.closest('.scroll-x');
     if (!row || row.scrollWidth <= row.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
-    var max = row.scrollWidth - row.clientWidth, to = Math.max(0, Math.min(max, row.scrollLeft + e.deltaY));
+    /* Some browsers (Firefox) and mouse drivers report lines or pages, not pixels */
+    var px = e.deltaY * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? row.clientWidth : 1);
+    var max = row.scrollWidth - row.clientWidth, to = Math.max(0, Math.min(max, row.scrollLeft + px));
     if (to === row.scrollLeft) return;
     e.preventDefault(); row.scrollLeft = to;
   }, { passive: false });
