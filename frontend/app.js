@@ -295,8 +295,19 @@
       var gid = window.google && window.google.accounts && window.google.accounts.id;
       if (!gid || !BOOT.googleClientId) return false;
       gid.initialize({ client_id: BOOT.googleClientId, callback: onCredential, ux_mode: 'popup', auto_select: false, cancel_on_tap_outside: true });
-      slot.innerHTML = '';
-      gid.renderButton(slot, { type: 'standard', theme: 'outline', size: 'large', shape: 'pill', text: 'continue_with', logo_alignment: 'center', width: Math.min(400, slot.clientWidth || 320) });
+      /* Google draws a stand-in button, then swaps in its own frame. Render it hidden behind the spinner and
+         fade it in once that frame has loaded, so the swap is never seen. */
+      slot.classList.remove('ready');
+      slot.innerHTML = '<span class="mini-spin" aria-label="Loading Google sign-in"></span><div class="gsi-btn"></div>';
+      var holder = slot.querySelector('.gsi-btn'), shown = false;
+      function show() { if (shown) return; shown = true; slot.classList.add('ready'); }
+      gid.renderButton(holder, { type: 'standard', theme: 'outline', size: 'large', shape: 'pill', text: 'continue_with', logo_alignment: 'center', width: Math.min(400, slot.clientWidth || 320) });
+      var waited = 0, look = setInterval(function () {   /* Google may add its frame a moment later */
+        var f = holder.querySelector('iframe');
+        if (f) { clearInterval(look); f.addEventListener('load', function () { timers.push(setTimeout(show, 150)); }); }
+        else if ((waited += 50) >= 1500) { clearInterval(look); show(); }
+      }, 50);
+      timers.push(look, setTimeout(show, 3000));   /* never leave the button hidden */
       return true;
     }
     if (ready()) return;

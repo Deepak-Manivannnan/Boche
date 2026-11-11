@@ -1520,8 +1520,12 @@ a.hm-cta, .hm-cta { min-height: 30px; }
 .wn-row.ot-h > span:nth-child(6) { padding-left: 4px; }
 
 /* Sign in with Google: Google draws its own button inside this slot (its branding rules); the slot keeps the welcome sheet's spacing */
-.gsi-slot { display: flex; justify-content: center; align-items: center; min-height: 44px; margin: 4px 0 2px; }
+.gsi-slot { position: relative; display: flex; justify-content: center; align-items: center; height: 44px; margin: 4px 0 2px; }
 .gsi-slot > div { width: 100%; display: flex; justify-content: center; }
+.gsi-slot .gsi-btn { opacity: 0; transition: opacity .25s ease; }
+.gsi-slot.ready .gsi-btn { opacity: 1; }
+.gsi-slot .mini-spin { position: absolute; left: 50%; top: 50%; margin: -10px 0 0 -10px; }
+.gsi-slot.ready .mini-spin { display: none; }
 /* Lucky Draw admin: fingerprints are long hex strings */
 .adm-fp { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; word-break: break-all; }
 /* Verify the draw */
