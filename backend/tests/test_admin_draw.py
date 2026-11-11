@@ -9,8 +9,8 @@ import sqlalchemy as sa
 from draw_support import drand_value, sealed_day
 from test_entries_api import at
 
-from app import models as m
-from app.drawrun import verify_chain
+from app.db import models as m
+from app.draw.drawrun import verify_chain
 from engine import pick_winners
 
 DAY = "2026-11-10"
@@ -193,7 +193,7 @@ def test_running_again_returns_the_saved_result_and_never_draws_twice(w, db_engi
 
 
 def test_a_crash_mid_draw_saves_nothing_and_a_retry_gives_the_same_winners(w, monkeypatch):
-    import app.drawrun as drawrun
+    import app.draw.drawrun as drawrun
 
     real, calls = drawrun.pick_winners, []
 

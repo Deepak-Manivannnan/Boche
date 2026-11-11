@@ -7,11 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy.orm import Session
 
-from app import models as m
-from app.config import REPO_ROOT
-from app.deps import get_db
-from app.lifecycle import advance
-from app.results import result_json, winners_public
+from app.core.config import REPO_ROOT
+from app.core.deps import get_db
+from app.db import models as m
+from app.draw.lifecycle import advance
+from app.draw.results import result_json, winners_public
 
 router = APIRouter(prefix="/api")
 Db = Annotated[Session, Depends(get_db)]

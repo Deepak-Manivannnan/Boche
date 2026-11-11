@@ -4,7 +4,7 @@ import hashlib
 
 import pytest
 
-from app.drand import CHAIN_HASH, DrandUnavailable, fetch_round
+from app.draw.drand import CHAIN_HASH, DrandUnavailable, fetch_round
 
 RELAYS = ["https://r1.example", "https://r2.example", "https://r3.example"]
 

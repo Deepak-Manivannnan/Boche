@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import mysql
 
-import app.models
+import app.db.models
 
 revision = "0001"
 down_revision = None
@@ -45,19 +45,19 @@ def upgrade() -> None:
             ),
             nullable=False,
         ),
-        sa.Column("closes_at", app.models.UTCDateTime(), nullable=False),
-        sa.Column("draw_not_before", app.models.UTCDateTime(), nullable=False),
-        sa.Column("publish_not_before", app.models.UTCDateTime(), nullable=False),
+        sa.Column("closes_at", app.db.models.UTCDateTime(), nullable=False),
+        sa.Column("draw_not_before", app.db.models.UTCDateTime(), nullable=False),
+        sa.Column("publish_not_before", app.db.models.UTCDateTime(), nullable=False),
         sa.Column("ticket_count", sa.Integer(), nullable=True),
         sa.Column("ticket_csv", sa.LargeBinary().with_variant(mysql.LONGBLOB(), "mysql"), nullable=True),
         sa.Column("fingerprint", sa.String(length=64), nullable=True),
         sa.Column("drand_round", sa.BigInteger(), nullable=True),
-        sa.Column("sealed_at", app.models.UTCDateTime(), nullable=True),
+        sa.Column("sealed_at", app.db.models.UTCDateTime(), nullable=True),
         sa.Column("seal_json", sa.Text(), nullable=True),
         sa.Column("seal_commit_sha", sa.String(length=64), nullable=True),
         sa.Column("seal_url", sa.String(length=500), nullable=True),
-        sa.Column("drawn_at", app.models.UTCDateTime(), nullable=True),
-        sa.Column("published_at", app.models.UTCDateTime(), nullable=True),
+        sa.Column("drawn_at", app.db.models.UTCDateTime(), nullable=True),
+        sa.Column("published_at", app.db.models.UTCDateTime(), nullable=True),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_draw_days")),
         sa.UniqueConstraint("label", name=op.f("uq_draw_days_label")),
     )
@@ -76,7 +76,7 @@ def upgrade() -> None:
             ),
             nullable=False,
         ),
-        sa.Column("created_at", app.models.UTCDateTime(), nullable=False),
+        sa.Column("created_at", app.db.models.UTCDateTime(), nullable=False),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_users")),
         sa.UniqueConstraint("email", name=op.f("uq_users_email")),
         sa.UniqueConstraint("google_sub", name=op.f("uq_users_google_sub")),
@@ -89,7 +89,7 @@ def upgrade() -> None:
         sa.Column("signature", sa.String(length=256), nullable=False),
         sa.Column("seed", sa.String(length=64), nullable=False),
         sa.Column("winners", sa.JSON(), nullable=False),
-        sa.Column("created_at", app.models.UTCDateTime(), nullable=False),
+        sa.Column("created_at", app.db.models.UTCDateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["draw_day_id"], ["draw_days.id"], name=op.f("fk_draw_results_draw_day_id_draw_days")
         ),
@@ -104,7 +104,7 @@ def upgrade() -> None:
         sa.Column("actor_user_id", sa.BigInteger(), nullable=True),
         sa.Column("outcome", sa.String(length=30), nullable=False),
         sa.Column("detail", sa.Text().with_variant(mysql.LONGTEXT(), "mysql"), nullable=True),
-        sa.Column("at", app.models.UTCDateTime(), nullable=False),
+        sa.Column("at", app.db.models.UTCDateTime(), nullable=False),
         sa.Column("prev_hash", sa.String(length=64), nullable=False),
         sa.Column("entry_hash", sa.String(length=64), nullable=False),
         sa.ForeignKeyConstraint(
@@ -140,9 +140,9 @@ def upgrade() -> None:
         sa.Column("gst_paise", sa.Integer(), nullable=False),
         sa.Column("total_paise", sa.Integer(), nullable=False),
         sa.Column("delivery", sa.JSON(), nullable=True),
-        sa.Column("created_at", app.models.UTCDateTime(), nullable=False),
-        sa.Column("paid_at", app.models.UTCDateTime(), nullable=True),
-        sa.Column("refunded_at", app.models.UTCDateTime(), nullable=True),
+        sa.Column("created_at", app.db.models.UTCDateTime(), nullable=False),
+        sa.Column("paid_at", app.db.models.UTCDateTime(), nullable=True),
+        sa.Column("refunded_at", app.db.models.UTCDateTime(), nullable=True),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], name=op.f("fk_orders_user_id_users")),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_orders")),
         sa.UniqueConstraint("public_id", name=op.f("uq_orders_public_id")),
@@ -155,11 +155,11 @@ def upgrade() -> None:
         sa.Column("purpose", sa.String(length=30), nullable=False),
         sa.Column("code_hash", sa.String(length=128), nullable=False),
         sa.Column("requested_by", sa.BigInteger(), nullable=False),
-        sa.Column("created_at", app.models.UTCDateTime(), nullable=False),
-        sa.Column("expires_at", app.models.UTCDateTime(), nullable=False),
+        sa.Column("created_at", app.db.models.UTCDateTime(), nullable=False),
+        sa.Column("expires_at", app.db.models.UTCDateTime(), nullable=False),
         sa.Column("attempts", sa.Integer(), nullable=False),
-        sa.Column("consumed_at", app.models.UTCDateTime(), nullable=True),
-        sa.Column("superseded_at", app.models.UTCDateTime(), nullable=True),
+        sa.Column("consumed_at", app.db.models.UTCDateTime(), nullable=True),
+        sa.Column("superseded_at", app.db.models.UTCDateTime(), nullable=True),
         sa.ForeignKeyConstraint(
             ["draw_day_id"], ["draw_days.id"], name=op.f("fk_otp_challenges_draw_day_id_draw_days")
         ),
@@ -175,8 +175,8 @@ def upgrade() -> None:
         sa.Column("public_id", sa.String(length=40), nullable=False),
         sa.Column("order_id", sa.BigInteger(), nullable=False),
         sa.Column("pack_id", sa.String(length=16), nullable=False),
-        sa.Column("scratched_at", app.models.UTCDateTime(), nullable=True),
-        sa.Column("entered_at", app.models.UTCDateTime(), nullable=True),
+        sa.Column("scratched_at", app.db.models.UTCDateTime(), nullable=True),
+        sa.Column("entered_at", app.db.models.UTCDateTime(), nullable=True),
         sa.Column("draw_day_id", sa.BigInteger(), nullable=True),
         sa.ForeignKeyConstraint(
             ["draw_day_id"], ["draw_days.id"], name=op.f("fk_cards_draw_day_id_draw_days")
@@ -217,7 +217,7 @@ def upgrade() -> None:
             ),
             nullable=False,
         ),
-        sa.Column("confirmed_at", app.models.UTCDateTime(), nullable=False),
+        sa.Column("confirmed_at", app.db.models.UTCDateTime(), nullable=False),
         sa.ForeignKeyConstraint(["order_id"], ["orders.id"], name=op.f("fk_payments_order_id_orders")),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_payments")),
         sa.UniqueConstraint("provider_ref", name=op.f("uq_payments_provider_ref")),
@@ -241,8 +241,8 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("draw_day_id", sa.BigInteger(), nullable=True),
-        sa.Column("issued_at", app.models.UTCDateTime(), nullable=False),
-        sa.Column("cancelled_at", app.models.UTCDateTime(), nullable=True),
+        sa.Column("issued_at", app.db.models.UTCDateTime(), nullable=False),
+        sa.Column("cancelled_at", app.db.models.UTCDateTime(), nullable=True),
         sa.ForeignKeyConstraint(["card_id"], ["cards.id"], name=op.f("fk_tickets_card_id_cards")),
         sa.ForeignKeyConstraint(
             ["draw_day_id"], ["draw_days.id"], name=op.f("fk_tickets_draw_day_id_draw_days")
@@ -265,7 +265,7 @@ def upgrade() -> None:
             ),
             nullable=False,
         ),
-        sa.Column("created_at", app.models.UTCDateTime(), nullable=False),
+        sa.Column("created_at", app.db.models.UTCDateTime(), nullable=False),
         sa.ForeignKeyConstraint(["ticket_id"], ["tickets.id"], name=op.f("fk_claims_ticket_id_tickets")),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], name=op.f("fk_claims_user_id_users")),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_claims")),

@@ -5,7 +5,7 @@ from collections.abc import Iterator
 from fastapi import HTTPException, Request
 from sqlalchemy.orm import Session
 
-from app import models as m
+from app.db import models as m
 
 
 def get_db(request: Request) -> Iterator[Session]:

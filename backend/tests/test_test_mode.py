@@ -12,8 +12,8 @@ from test_entries_api import at, enter
 from test_orders_api import buy
 
 import verify
-from app import models as m
-from app.drand import round_released_at
+from app.db import models as m
+from app.draw.drand import round_released_at
 
 
 @pytest.fixture

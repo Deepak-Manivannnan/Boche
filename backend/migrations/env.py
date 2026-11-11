@@ -1,7 +1,7 @@
 import sqlalchemy as sa
 from alembic import context
 
-from app.models import Base
+from app.db.models import Base
 
 config = context.config
 
@@ -10,7 +10,7 @@ def _url() -> str:
     url = config.attributes.get("database_url")
     if url:
         return url
-    from app.config import database_url
+    from app.core.config import database_url
 
     return database_url()
 

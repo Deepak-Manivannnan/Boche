@@ -78,7 +78,8 @@ mysql+pymysql://<user>:<password>@<host>:4000/boche?ssl_ca=/etc/ssl/certs/ca-cer
 | Folder | Contents |
 |---|---|
 | `frontend/` | The prototype, served by the backend (changes are listed in the design note) |
-| `backend/` | FastAPI app (`/api`), models, Alembic migrations |
+| `backend/app/` | FastAPI app (`/api`), grouped by feature: `core/` (settings, clock, dependencies, migrations runner), `db/` (models), `auth/` (Google sign-in, sessions, sign-in API), `shop/` (packs, prices, mock payment, lucky numbers, orders API), `draw/` (draw days, seal, drand, founder's OTP, draw run, results, test mode, entries/admin/public APIs) |
+| `backend/migrations/`, `backend/tests/` | Alembic migrations; backend tests |
 | `engine/` | Draw engine: pure Python, standard library only |
 | `verifier/` | Standalone Verifier for outsiders (see `verifier/README.md`) |
 | `docs/` | ADRs and agent docs; design note later |

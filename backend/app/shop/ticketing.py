@@ -4,7 +4,7 @@ The database's unique constraint is the final guarantee that no number is issued
 import secrets
 from collections.abc import Callable, Iterable
 
-from app.catalog import LETTERS
+from app.shop.catalog import LETTERS
 
 MAX_ROUNDS = 100
 

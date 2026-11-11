@@ -6,8 +6,8 @@ import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app import models as m
-from app.clock import ist_date, ist_time
+from app.core.clock import ist_date, ist_time
+from app.db import models as m
 
 ENTRIES_CLOSE = (20, 0)  # 8:00 PM IST: no Ticket can be added, removed or changed after this
 DRAW_FROM = (20, 15)  # 8:15 PM IST: the Randomness round is released; the draw may run

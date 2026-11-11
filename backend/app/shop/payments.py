@@ -14,9 +14,9 @@ import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app import models as m
-from app.catalog import PACKS
-from app.ticketing import unique_numbers
+from app.db import models as m
+from app.shop.catalog import PACKS
+from app.shop.ticketing import unique_numbers
 
 SIGNATURE_HEADER = "X-Mockpay-Signature"
 

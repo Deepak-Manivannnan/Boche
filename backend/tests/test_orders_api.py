@@ -9,7 +9,7 @@ import pytest
 import sqlalchemy as sa
 from api_support import PAYMENT_SECRET
 
-from app import models as m
+from app.db import models as m
 
 LUCKY_NUMBER = re.compile(r"^[ABCDEFGHJKLMNPRSTUVWXYZ]{2} \d{6}$")
 DELIVERY = {

@@ -6,9 +6,9 @@ import subprocess
 
 import pytest
 
-from app.catalog import LETTERS, LOGISTICS_GST_RATE, MAX_QTY, PACKS, TEA_GST_RATE, quote
 from app.main import FRONTEND_DIR
-from app.ticketing import new_lucky_number, unique_numbers
+from app.shop.catalog import LETTERS, LOGISTICS_GST_RATE, MAX_QTY, PACKS, TEA_GST_RATE, quote
+from app.shop.ticketing import new_lucky_number, unique_numbers
 
 
 def prototype_data() -> dict:
@@ -76,7 +76,7 @@ def test_drawing_gives_up_loudly_rather_than_looping_forever():
 
 
 def test_server_prize_table_matches_the_prototype():
-    from app.catalog import prize
+    from app.shop.catalog import prize
 
     node = shutil.which("node")
     if not node:

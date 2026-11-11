@@ -8,10 +8,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app import models as m
-from app.catalog import prize
-from app.deps import current_user, get_db, require_admin
-from app.drawdays import accepts_entries, entry_day, real_day
+from app.core.deps import current_user, get_db, require_admin
+from app.db import models as m
+from app.draw.drawdays import accepts_entries, entry_day, real_day
+from app.shop.catalog import prize
 
 router = APIRouter(prefix="/api")
 Db = Annotated[Session, Depends(get_db)]

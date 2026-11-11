@@ -8,7 +8,7 @@ from google.auth import exceptions as google_exceptions
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
 
-from app.clock import Clock
+from app.core.clock import Clock
 
 
 class AuthError(Exception):

@@ -15,7 +15,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 from google.auth import crypt, jwt
 
-from app.auth import AuthError, AuthUnavailable, GoogleTokenVerifier
+from app.auth.google import AuthError, AuthUnavailable, GoogleTokenVerifier
 
 CLIENT_ID = "1234-test.apps.googleusercontent.com"
 KID = "test-key-1"

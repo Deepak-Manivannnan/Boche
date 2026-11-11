@@ -2,7 +2,7 @@ from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
-from app.clock import IST, FixedClock, SystemClock, ist_date, ist_time
+from app.core.clock import IST, FixedClock, SystemClock, ist_date, ist_time
 
 
 def test_system_clock_returns_an_aware_utc_time():

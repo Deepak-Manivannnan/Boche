@@ -6,7 +6,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from app.config import load_env
+from app.core.config import load_env
 
 load_env()
 
@@ -20,7 +20,7 @@ def migrated_url() -> str:
         pytest.exit(
             f"refusing to run destructive tests on {sa.make_url(url).database!r}: name must end in _test"
         )
-    from app.migrate import downgrade_all, upgrade_to_head
+    from app.core.migrate import downgrade_all, upgrade_to_head
 
     downgrade_all(url)
     upgrade_to_head(url)
@@ -35,7 +35,7 @@ def db_engine(migrated_url):
 
 
 def _delete_all_rows(engine) -> None:
-    from app.models import Base
+    from app.db.models import Base
 
     with engine.begin() as conn:
         for table in reversed(Base.metadata.sorted_tables):
@@ -57,7 +57,7 @@ class FakeGoogle:
     """Stands in for Google: a credential "<name>-token-xxxxxxxxxx" signs in as <name>."""
 
     def __call__(self, credential: str):
-        from app.auth import AuthError, GoogleIdentity
+        from app.auth.google import AuthError, GoogleIdentity
 
         name = credential.split("-token-")[0]
         if not credential.endswith("-token-xxxxxxxxxx") or not name.isalpha():
@@ -74,8 +74,8 @@ def make_client(migrated_url, clean_db):
 
     from fastapi.testclient import TestClient
 
-    from app.clock import FixedClock
-    from app.config import Settings
+    from app.core.clock import FixedClock
+    from app.core.config import Settings
     from app.main import create_app
 
     settings = Settings(

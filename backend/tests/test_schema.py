@@ -6,7 +6,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 
-from app import models as m
+from app.db import models as m
 
 EXPECTED_TABLES = {
     "users",
@@ -68,13 +68,13 @@ def test_migrations_create_every_table(db_engine):
 def test_the_migrations_match_the_models_exactly(migrated_url):
     from alembic import command
 
-    from app.migrate import _config
+    from app.core.migrate import _config
 
     command.check(_config(migrated_url))  # raises if a model change has no migration
 
 
 def test_migrations_can_be_rolled_back_and_reapplied(migrated_url):
-    from app.migrate import downgrade_all, upgrade_to_head
+    from app.core.migrate import downgrade_all, upgrade_to_head
 
     downgrade_all(migrated_url)
     assert not EXPECTED_TABLES & set(sa.inspect(sa.create_engine(migrated_url)).get_table_names())

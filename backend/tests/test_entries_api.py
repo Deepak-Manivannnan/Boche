@@ -6,7 +6,7 @@ import pytest
 import sqlalchemy as sa
 from test_orders_api import buy
 
-from app import models as m
+from app.db import models as m
 
 DAY = "2026-11-10"
 NEXT_DAY = "2026-11-11"
@@ -14,7 +14,7 @@ NEXT_DAY = "2026-11-11"
 
 def at(client, hh, mm, ss=0, day=10):
     """Set the server clock to an IST wall-clock time on 2026-11-<day>."""
-    from app.clock import IST
+    from app.core.clock import IST
 
     client.app.state.test_clock.set(datetime(2026, 11, day, hh, mm, ss, tzinfo=IST))
 

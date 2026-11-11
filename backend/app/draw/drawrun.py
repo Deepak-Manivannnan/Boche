@@ -13,9 +13,9 @@ import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app import models as m
-from app.drand import DrandUnavailable
-from app.otp import OtpRefused, check_otp
+from app.db import models as m
+from app.draw.drand import DrandUnavailable
+from app.draw.otp import OtpRefused, check_otp
 from engine import pick_winners
 
 GENESIS_HASH = "0" * 64

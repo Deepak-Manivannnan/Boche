@@ -5,9 +5,9 @@ from datetime import UTC, datetime
 import pytest
 from fastapi.testclient import TestClient
 
-from app.auth import AuthError, AuthUnavailable, GoogleIdentity
-from app.clock import FixedClock
-from app.config import Settings
+from app.auth.google import AuthError, AuthUnavailable, GoogleIdentity
+from app.core.clock import FixedClock
+from app.core.config import Settings
 from app.main import create_app
 
 ARUN = GoogleIdentity(sub="g-arun", email="arun@example.com", name="Arun Mathew", picture=None)

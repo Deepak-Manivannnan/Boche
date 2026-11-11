@@ -21,9 +21,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 import sqlalchemy as sa  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 
-from app.clock import SystemClock  # noqa: E402
-from app.config import Settings  # noqa: E402
-from app.testmode import close_test_day, create_test_day, seed_tickets  # noqa: E402
+from app.core.clock import SystemClock  # noqa: E402
+from app.core.config import Settings  # noqa: E402
+from app.draw.testmode import close_test_day, create_test_day, seed_tickets  # noqa: E402
 
 BATCH = 2500
 

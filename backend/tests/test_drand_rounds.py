@@ -3,7 +3,14 @@
 from datetime import UTC, datetime, timedelta
 
 import verify
-from app.drand import CHAIN_HASH, GENESIS, PERIOD, first_round_at_or_after, round_for_seal, round_released_at
+from app.draw.drand import (
+    CHAIN_HASH,
+    GENESIS,
+    PERIOD,
+    first_round_at_or_after,
+    round_for_seal,
+    round_released_at,
+)
 
 
 def test_the_backend_and_the_verifier_use_the_same_drand_chain():

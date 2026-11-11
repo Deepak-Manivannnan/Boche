@@ -10,8 +10,8 @@ from test_entries_api import at, enter
 from test_orders_api import buy
 
 import verify
-from app import models as m
-from app.clock import IST
+from app.core.clock import IST
+from app.db import models as m
 from engine import canonical_csv
 
 DAY = "2026-11-10"

@@ -9,10 +9,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, StrictInt, field_validator
 from sqlalchemy.orm import Session, selectinload
 
-from app import models as m
-from app.catalog import LOGISTICS_GST_RATE, MAX_QTY, PACKS, TEA_GST_RATE, prize, quote
-from app.deps import current_user, get_db
-from app.payments import SIGNATURE_HEADER, MockPaymentProvider, PaymentRejected, confirm_payment
+from app.core.deps import current_user, get_db
+from app.db import models as m
+from app.shop.catalog import LOGISTICS_GST_RATE, MAX_QTY, PACKS, TEA_GST_RATE, prize, quote
+from app.shop.payments import SIGNATURE_HEADER, MockPaymentProvider, PaymentRejected, confirm_payment
 
 router = APIRouter(prefix="/api")
 Db = Annotated[Session, Depends(get_db)]

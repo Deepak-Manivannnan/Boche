@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from test_entries_api import at, enter
 from test_orders_api import buy
 
-from app.drand import DrandUnavailable
+from app.draw.drand import DrandUnavailable
 
 DAY = "2026-11-10"
 

@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from app.seals import GitHubSealPublisher, SealConflict
+from app.draw.seals import GitHubSealPublisher, SealConflict
 
 SEAL = b'{"draw_day": "2026-11-10"}\n'
 

@@ -9,7 +9,7 @@ from draw_support import DAY, drand_value, draw, sealed_day
 from test_entries_api import at
 
 import verify
-from app import models as m
+from app.db import models as m
 
 RESULT = f"/api/public/days/{DAY}/result.json"
 

@@ -7,9 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app import models as m
-from app.auth import AuthError, AuthUnavailable
-from app.deps import current_user, get_db, user_json
+from app.auth.google import AuthError, AuthUnavailable
+from app.core.deps import current_user, get_db, user_json
+from app.db import models as m
 
 router = APIRouter(prefix="/api")
 Db = Annotated[Session, Depends(get_db)]

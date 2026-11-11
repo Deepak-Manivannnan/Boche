@@ -11,11 +11,11 @@ from datetime import datetime, timedelta
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from app import models as m
-from app.catalog import MAX_QTY, quote
-from app.clock import IST
-from app.lifecycle import close_day
-from app.payments import MockPaymentProvider, confirm_payment
+from app.core.clock import IST
+from app.db import models as m
+from app.draw.lifecycle import close_day
+from app.shop.catalog import MAX_QTY, quote
+from app.shop.payments import MockPaymentProvider, confirm_payment
 
 FAR_FUTURE = timedelta(days=3650)  # a Test day only closes when an Admin says so
 TEST_CUSTOMERS = 20

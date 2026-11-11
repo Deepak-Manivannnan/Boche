@@ -5,9 +5,9 @@ import re
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from app import models as m
-from app.catalog import prize
-from app.drand import CHAIN_HASH
+from app.db import models as m
+from app.draw.drand import CHAIN_HASH
+from app.shop.catalog import prize
 from engine import SCHEME
 
 

@@ -11,13 +11,13 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import sessionmaker
 from starlette.concurrency import run_in_threadpool
 
-from app.auth import GoogleTokenVerifier, Sessions
-from app.clock import Clock, SystemClock
-from app.config import REPO_ROOT, Settings
-from app.drand import fetch_round
-from app.lifecycle import advance
-from app.otp import LogOtpSender
-from app.seals import GitHubSealPublisher
+from app.auth.google import GoogleTokenVerifier, Sessions
+from app.core.clock import Clock, SystemClock
+from app.core.config import REPO_ROOT, Settings
+from app.draw.drand import fetch_round
+from app.draw.lifecycle import advance
+from app.draw.otp import LogOtpSender
+from app.draw.seals import GitHubSealPublisher
 
 log = logging.getLogger("boche")
 
@@ -94,11 +94,11 @@ def create_app(
             return JSONResponse({"status": "degraded", "database": "unreachable"}, status_code=503)
         return {"status": "ok", "database": "connected"}
 
-    from app.routes_admin import router as admin_router
-    from app.routes_auth import router as auth_router
-    from app.routes_entries import router as entries_router
-    from app.routes_orders import router as orders_router
-    from app.routes_public import router as public_router
+    from app.auth.routes import router as auth_router
+    from app.draw.routes_admin import router as admin_router
+    from app.draw.routes_entries import router as entries_router
+    from app.draw.routes_public import router as public_router
+    from app.shop.routes import router as orders_router
 
     app.include_router(auth_router)
     app.include_router(orders_router)
