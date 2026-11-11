@@ -143,38 +143,38 @@
       announce(w);
     }
 
-    /* The seven consolation numbers roll together and lock one after another (10th up to 4th), so the
-       wait goes into the top three. */
+    /* Lucky 7: a board of seven rows (10th at the top, 4th at the bottom). One row at a time lights up,
+       rolls for about a second and locks with a bell, then the next row starts. ~7 s in all. */
     function consolation() {
       var list = p.order.filter(function (w) { return !w.big; });
       if (!list.length) { next(); return; }
-      mode('rolling'); ladder(0);
+      mode(''); ladder(0);
       body.innerHTML = '<div class="rv-k">Lucky 7 · consolation prizes</div><div class="rv-prize">' + inr(list[0].amount) + ' each</div>' +
-        '<div class="rv-grid">' + list.map(function (w, k) {
-          return '<div class="rv-gr" id="rvG' + k + '"><span class="rv-gp">' + ordinal(w.rank) + '</span><div class="rv-no sm">' + cells(scrambleFrame(w.ticket, 0, Math.random()), 0) + '</div><span class="rv-gw"></span></div>';
+        '<div class="rv-board">' + list.map(function (w, k) {
+          return '<div class="rv-row7" id="rvG' + k + '"><span class="rv-pl">' + ordinal(w.rank) + '</span>' +
+            '<span class="rv-tk">' + esc(w.ticket.replace(/[A-Z0-9]/g, '•')) + '</span><span class="rv-nm"></span></div>';
         }).join('') + '</div>';
-      var locked = list.map(function () { return false; });
-      var flick = setInterval(function () {
-        list.forEach(function (w, k) { if (!locked[k]) body.querySelector('#rvG' + k + ' .rv-no').innerHTML = cells(scrambleFrame(w.ticket, 0, Math.random()), 0); });
-      }, 60);
-      timers.push(flick);
-      list.forEach(function (w, k) {
-        later(function () {
-          locked[k] = true;
-          var row = body.querySelector('#rvG' + k);
-          row.querySelector('.rv-no').innerHTML = cells(w.ticket, w.ticket.length);
-          row.classList.add('done');
-          if (w.mine) { row.classList.add('mine'); row.querySelector('.rv-gw').innerHTML = '<b class="rv-you">You!</b>'; }
-          else row.querySelector('.rv-gw').textContent = w.name || '';
-          ladder(k + 1); sfx.ding(k);
-          if (k < list.length - 1) return;
-          clearInterval(flick);
+      (function step(k) {
+        if (k >= list.length) {
           var me = list.some(function (x) { return x.mine; });
-          mode(me ? 'rv-me' : '');
-          if (me) { if (opts.chime) opts.chime(); fx.innerHTML = reduced ? '' : (opts.confetti ? opts.confetti() : ''); }
-          later(function () { fx.innerHTML = ''; i = list.length - 1; next(); }, 2200);
-        }, 900 + k * 450);
-      });
+          if (me) { el.classList.add('rv-me'); if (opts.chime) opts.chime(); fx.innerHTML = reduced ? '' : (opts.confetti ? opts.confetti() : ''); }
+          later(function () { fx.innerHTML = ''; i = list.length - 1; next(); }, 1800);
+          return;
+        }
+        var w = list[k], row = body.querySelector('#rvG' + k), tk = row.querySelector('.rv-tk');
+        row.classList.add('live'); mode('rolling');
+        var flick = setInterval(function () { tk.textContent = scrambleFrame(w.ticket, 0, Math.random()); }, 55);
+        timers.push(flick);
+        later(function () {
+          clearInterval(flick); mode('');
+          tk.textContent = w.ticket;
+          row.classList.remove('live'); row.classList.add('done');
+          var nm = row.querySelector('.rv-nm');
+          if (w.mine) { row.classList.add('mine'); nm.innerHTML = '<b>You!</b>'; } else nm.textContent = w.name || '';
+          ladder(k + 1); sfx.ding(k);
+          later(function () { step(k + 1); }, 260);
+        }, 750);
+      })(0);
     }
 
     /* A pause before the main prizes: the lights go down. */

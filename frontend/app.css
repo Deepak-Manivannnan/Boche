@@ -1610,17 +1610,19 @@ a.hm-cta, .hm-cta { min-height: 30px; }
 @media (prefers-reduced-motion: reduce) { .rv, .rv-count, .rv-place, .rv-no, .rv-no.done, .rv-balloons i, .rv-matrix i, .rv-rays, .rv-sparkle i, .rv-ladder i, .rv-burst b { animation: none; } }
 /* A button whose request is still running (api.js) */
 .btn.is-busy, button.is-busy { opacity: .55; pointer-events: none; cursor: progress; }
-/* Reveal: the Lucky 7 grid, the sound toggle; links never underlined */
-.rv-grid { display: flex; flex-direction: column; gap: 7px; max-width: 340px; margin: 0 auto; }
-.rv-gr { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-radius: 10px; border: 1px solid rgba(217, 180, 90, .18); transition: background .3s, border-color .3s; }
-.rv-gr.done { background: rgba(217, 180, 90, .1); border-color: rgba(217, 180, 90, .45); animation: rv-lock .4s ease-out; }
-.rv-gr.mine { border-color: #fff; box-shadow: 0 0 18px rgba(217, 180, 90, .6); }
-.rv-gp { width: 34px; font: 700 13px var(--font); color: var(--gold-l); text-align: left; }
-.rv-no.sm { padding: 0; border: 0; background: none; gap: 2px; box-shadow: none; animation: none; }
-.rv-no.sm span { width: 19px; padding: 4px 0; font-size: 17px; border-radius: 4px; }
-.rv-no.sm s { width: 5px; }
-.rv-gw { flex: 1; min-width: 0; text-align: right; font-size: 12px; color: rgba(243, 230, 196, .8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rv-gw .rv-you { font-size: 14px; }
+/* Reveal: the Lucky 7 board, the sound toggle; links never underlined */
+.rv-board { max-width: 330px; margin: 0 auto; border-radius: var(--r-md); border: 1px solid rgba(217, 180, 90, .3); background: rgba(0, 0, 0, .28); overflow: hidden; }
+.rv-row7 { display: grid; grid-template-columns: 44px auto 1fr; align-items: center; column-gap: 12px; padding: 9px 14px; border-top: 1px solid rgba(217, 180, 90, .12); text-align: left; transition: background .25s; }
+.rv-row7:first-child { border-top: 0; }
+.rv-pl { font: 700 13px var(--font); color: rgba(243, 230, 196, .45); }
+.rv-tk { font: 700 19px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .06em; color: rgba(243, 230, 196, .28); white-space: pre; }
+.rv-nm { min-width: 0; font-size: 12.5px; color: rgba(243, 230, 196, .75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+.rv-row7.live { background: rgba(217, 180, 90, .14); }
+.rv-row7.live .rv-tk { color: #fff; text-shadow: 0 0 10px rgba(217, 180, 90, .7); }
+.rv-row7.live .rv-pl, .rv-row7.done .rv-pl { color: var(--gold-l); }
+.rv-row7.done .rv-tk { color: var(--gold-xl); animation: rv-hit .4s ease-out; }
+.rv-row7.mine { background: rgba(217, 180, 90, .22); box-shadow: inset 3px 0 0 var(--gold-l); }
+.rv-row7.mine .rv-nm b { color: #fff; font-size: 13.5px; }
 .rv-snd { position: absolute; top: 14px; right: 84px; z-index: 5; background: rgba(0, 0, 0, .3); color: var(--gold-xl); border: 1px solid rgba(217, 180, 90, .4); border-radius: 999px; padding: 6px 12px; font: 600 13px var(--font); cursor: pointer; }
 .rv-ladder { right: 150px; }
 a.link, a.btn { text-decoration: none; }
