@@ -1809,7 +1809,7 @@
     if (!d) return head + '<div class="pad mt16"><div class="surface sp-empty">' + ic('calendar', 18) + '<span>No draw days yet. A day appears when its first card is entered.</span></div>' + testPanel + '</div>';
     var st = ADM_STATUS[d.status] || [d.status, 'plain'], body;
     var seeding = A.seeding && A.seeding.label === d.label ? A.seeding : null;
-    if (d.status === 'open' && d.kind === 'test') body = '<div class="btn-row mt16"><button class="btn btn-line" data-act="admSeed"' + (seeding ? ' disabled' : '') + '>' + (seeding ? 'Adding… ' + num(seeding.done) + ' / ' + num(seeding.target) : 'Add 15,000 tickets') + '</button>' +
+    if (d.status === 'open' && d.kind === 'test') body = '<div class="btn-row mt16"><button class="btn btn-line" data-act="admSeed"' + (seeding ? ' disabled' : '') + '>' + (seeding ? 'Adding… ' + num(seeding.done) + ' / ' + num(seeding.target) : 'Add 5,000 tickets') + '</button>' +
       '<button class="btn btn-gold" data-act="admClose"' + (seeding || !d.ticketCount ? ' disabled' : '') + '>Close entries now</button></div>' +
       '<p class="fine center">Tickets are bought by 20 test customers through the real paid-order path. Closing seals the list and picks a drand round about 30 s ahead.</p>';
     else if (d.status === 'open') body = '<div class="rule-note mt16">' + ic('clock', 16) + '<span>Entries close at ' + istTime(d.closesAt) + '. The ticket list is then sealed automatically.</span></div>';
@@ -1961,10 +1961,10 @@
       BCAPI.post('/admin/test-days').then(function (day) { ui.adm.busy = false; ui.adm.sel = day.label; return admLoad().then(rerender); },
         function (e) { ui.adm.busy = false; toast(e.message || 'Could not create a test day'); });
     },
-    /* 15,000 tickets in batches of 2,500 so every request stays short */
+    /* 5,000 tickets in batches of 2,500 so every request stays short */
     admSeed: function () {
       var d = admDay(); if (!d || ui.adm.seeding) return;
-      var S2 = ui.adm.seeding = { label: d.label, done: 0, target: 15000 };
+      var S2 = ui.adm.seeding = { label: d.label, done: 0, target: 5000 };
       (function next() {
         if (S2.done >= S2.target) { ui.adm.seeding = null; toast(num(S2.target) + ' tickets added'); admLoad().then(rerender); return; }
         BCAPI.post('/admin/test-days/' + encodeURIComponent(S2.label) + '/seed', { count: Math.min(2500, S2.target - S2.done) }).then(function () {
@@ -2451,6 +2451,14 @@
     }
   });
   $('sheetBackdrop').addEventListener('click', function () { closeSheet(); });
+  /* A mouse wheel scrolls sideways rows (.scroll-x) too; trackpads already swipe them */
+  document.addEventListener('wheel', function (e) {
+    var row = e.target.closest && e.target.closest('.scroll-x');
+    if (!row || row.scrollWidth <= row.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+    var max = row.scrollWidth - row.clientWidth, to = Math.max(0, Math.min(max, row.scrollLeft + e.deltaY));
+    if (to === row.scrollLeft) return;
+    e.preventDefault(); row.scrollLeft = to;
+  }, { passive: false });
   window.addEventListener('popstate', function () { render(); });
   /* Old links (/#/verify-draw) and /index.html open at their clean URL */
   if (location.hash.indexOf('#/') === 0) history.replaceState(null, '', '/' + location.hash.slice(2));

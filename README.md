@@ -60,13 +60,13 @@ The DB tests refuse to run unless the test database's name ends in `_test`, beca
 
 No need to wait for 8 PM. Sign in at `/staff` with an email listed in `ADMIN_EMAILS`, open **Tonight's draw**, then:
 
-1. **New test day**, then **Add 15,000 tickets** (20 test customers buy tea through the real paid-order path).
+1. **New test day**, then **Add 5,000 tickets** (20 test customers buy tea through the real paid-order path; press it again for more, or use the script below for 15,000).
 2. **Close entries now**: the list is frozen, fingerprinted and sealed to GitHub; the Seal names a drand round about 30 s ahead.
 3. When the round is out, **Send OTP to founder**. The code goes to the founder's phone by SMS (or to the server log if SMS_MODE is unset), on test days too.
 4. Enter the code and **Run the draw**. With the default gap of 0 the result is published at once.
 5. **Verify this draw**, or run `python verifier/verify.py <test-day-label>`.
 
-From the command line instead: `python scripts/generate_tickets.py --count 15000 --close` (uses `DATABASE_URL`).
+From the command line instead: `python scripts/generate_tickets.py --count 15000 --close` (uses `DATABASE_URL`). To remove every Test day: `python scripts/delete_test_days.py`.
 
 Test days are labelled TEST everywhere, never take customer entries and never change a real Draw day.
 

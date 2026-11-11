@@ -183,3 +183,26 @@ def test_test_days_are_numbered_and_skip_labels_already_sealed_elsewhere(clean_d
     assert create_test_day(session, now).label == "test-1"
     assert create_test_day(session, now, lambda label: label in {"test-2", "test-3"}).label == "test-4"
     assert create_test_day(session, now).label == "test-5"
+
+
+def test_deleting_test_days_removes_them_and_their_tickets_but_keeps_real_ones(t, db_engine):
+    from sqlalchemy.orm import Session
+
+    from app.draw.testmode import delete_test_days
+
+    real = buy(t.arun, {"p500": 1})["cards"][0]
+    enter(t.arun, real["id"])
+    label = new_day(t)
+    seed(t, label, 40)
+    day = close(t, label)
+    after_round(t, day)
+    t.admin.post(f"/api/admin/draw-days/{label}/otp")
+    t.admin.post(f"/api/admin/draw-days/{label}/run", json={"code": t.state.otp_sender.code})
+    with Session(db_engine) as db:
+        assert delete_test_days(db) == 1
+    with db_engine.connect() as conn:
+        tests = sa.select(sa.func.count()).select_from(m.DrawDay).where(m.DrawDay.kind == "test")
+        assert conn.scalar(tests) == 0
+        assert conn.scalar(sa.select(m.DrawDay.status).where(m.DrawDay.label == "2026-11-10")) == "open"
+    assert ticket_count(db_engine, "2026-11-10") == 3
+    assert ticket_count(db_engine, label) == 0

@@ -164,3 +164,36 @@ def close_test_day(db: Session, label: str, now: datetime, publish_gap: timedelt
     day.publish_not_before = day.draw_not_before + publish_gap
     db.commit()
     return day
+
+
+def delete_test_days(db: Session) -> int:
+    """Remove every Test day and the test customers' orders, cards and tickets. Real Draw days and real
+    customers' data are never touched. Seal files already on GitHub stay there. Returns days removed."""
+    days = sa.select(m.DrawDay.id).where(m.DrawDay.kind == "test")
+    orders = (
+        sa.select(m.Order.id)
+        .join(m.User, m.Order.user_id == m.User.id)
+        .where(m.User.google_sub.like("test-customer-%"))
+    )
+    cards = sa.select(m.Card.id).where(sa.or_(m.Card.draw_day_id.in_(days), m.Card.order_id.in_(orders)))
+    tickets = sa.select(m.Ticket.id).where(
+        sa.or_(m.Ticket.draw_day_id.in_(days), m.Ticket.card_id.in_(cards))
+    )
+    count = len(db.scalars(days).all())
+    db.execute(sa.delete(m.Claim).where(m.Claim.ticket_id.in_(tickets.scalar_subquery())))
+    for model, col, sub in (
+        (m.Ticket, m.Ticket.id, tickets),
+        (m.Card, m.Card.id, cards),
+        (m.DrawResult, m.DrawResult.draw_day_id, days),
+        (m.DrawRun, m.DrawRun.draw_day_id, days),
+        (m.OtpChallenge, m.OtpChallenge.draw_day_id, days),
+        (m.OrderItem, m.OrderItem.order_id, orders),
+        (m.Payment, m.Payment.order_id, orders),
+        (m.Order, m.Order.id, orders),
+        (m.DrawDay, m.DrawDay.id, days),
+    ):
+        ids = db.scalars(sub).all()
+        if ids:
+            db.execute(sa.delete(model).where(col.in_(ids)))
+    db.commit()
+    return count
