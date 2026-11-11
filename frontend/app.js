@@ -268,7 +268,7 @@
       '<p class="wl-sub">Sign in or join with your Google account</p>' +
       '<div class="gsi-slot" id="gsiBtn"><span class="mini-spin" aria-label="Loading Google sign-in"></span></div>' +
       '<div class="err-text" id="mobErr">' + esc(ui.signInErr || '') + '</div>' +
-      '<p class="wl-legal">Free to join · <a class="link" href="/verify-draw">Verify past draws</a></p></div></div>';
+      '<p class="wl-legal"><a class="link" href="/staff">Admin login</a> · <a class="link" href="/verify-draw">Verify past draws</a></p></div></div>';
   };
   SCREENS.login = SCREENS.welcome;
   function wireMobile(inpId, btnId, errId, onEnter, noFocus) {
