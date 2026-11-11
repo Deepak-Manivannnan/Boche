@@ -1503,6 +1503,7 @@
   SCREENS['verify-draw'] = function (focus) {
     var days = PUBLIC_DAYS, api = '/api/public/days/';
     function dl(href, text) { return '<a class="link" href="' + esc(href) + '" target="_blank" rel="noopener">' + esc(text) + '</a>'; }
+    function file(href, text) { return '<a class="link" href="' + esc(href) + '" download>' + esc(text) + '</a>'; }   /* our files download; external links open */
     var guide = '<div class="surface" style="padding:4px 16px"><div class="field-l" style="margin-top:12px">Check any draw yourself</div>' +
       '<ol class="vd-steps"><li>Install Python 3.11 or newer. Nothing else is needed.</li>' +
       '<li>Download ' + dl('/api/public/verifier/verify.py', 'verify.py') + ' (also on GitHub with the source).</li>' +
@@ -1515,9 +1516,9 @@
           '<div class="kv"><span><b>' + esc(d.label) + '</b>' + (d.kind === 'test' ? ' <span class="badge warn">TEST</span>' : '') + '</span><span><span class="badge ' + (pub ? 'ok' : 'plain') + '">' + (pub ? 'Published' : 'Sealed · result at 8:30 PM') + '</span></span></div>' +
           '<div class="kv"><span>Tickets</span><span>' + num(d.ticketCount || 0) + '</span></div>' +
           '<div class="kv"><span>Fingerprint</span><span class="adm-fp">' + esc(d.fingerprint || '') + '</span></div>' +
-          '<div class="kv"><span>Seal</span><span>' + (d.sealUrl ? dl(d.sealUrl, 'On GitHub') : 'Publishing…') + ' · ' + dl(api + d.label + '/seal.json', 'seal.json') + '</span></div>' +
+          '<div class="kv"><span>Seal</span><span>' + (d.sealUrl ? dl(d.sealUrl, 'On GitHub') : 'Publishing…') + ' · ' + file(api + d.label + '/seal.json', 'seal.json') + '</span></div>' +
           '<div class="kv"><span>Randomness</span><span>' + dl('https://api.drand.sh/' + DRAND_CHAIN + '/public/' + d.drandRound, 'drand round ' + d.drandRound) + '</span></div>' +
-          '<div class="kv"><span>Files</span><span>' + dl(api + d.label + '/tickets.csv', 'tickets.csv') + (pub ? ' · ' + dl(api + d.label + '/result.json', 'result.json') : '') + '</span></div>' +
+          '<div class="kv"><span>Files</span><span>' + file(api + d.label + '/tickets.csv', 'tickets.csv') + (pub ? ' · ' + file(api + d.label + '/result.json', 'result.json') : '') + '</span></div>' +
           '<div class="kv"><span>Command</span><span><code>python verify.py ' + esc(d.label) + '</code></span></div></div>';
       }).join('');
     return topbar('Verify the draw', SES.authed ? 'draw' : 'welcome', ' ') + '<div class="pad">' +

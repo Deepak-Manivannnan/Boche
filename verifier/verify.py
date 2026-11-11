@@ -198,24 +198,28 @@ class FolderSources:
         self.folder = Path(folder)
         self.relays = relays or DRAND_RELAYS
 
-    def _read(self, name: str) -> bytes:
-        path = self.folder / name
-        if not path.is_file():
-            raise SourceError(f"{name} not found in {self.folder}")
-        return path.read_bytes()
+    def _find(self, stem: str, ext: str, day: str) -> Path:
+        """Accept either the plain name (tickets.csv) or the name the site downloads (tickets-<day>.csv)."""
+        for name in (f"{stem}.{ext}", f"{stem}-{day}.{ext}"):
+            if (self.folder / name).is_file():
+                return self.folder / name
+        raise SourceError(f"{stem}.{ext} (or {stem}-{day}.{ext}) not found in {self.folder}")
 
     def tickets_csv(self, day: str) -> tuple[bytes, str]:
-        return self._read("tickets.csv"), str(self.folder / "tickets.csv")
+        path = self._find("tickets", "csv", day)
+        return path.read_bytes(), str(path)
 
     def result(self, day: str) -> tuple[dict, str]:
-        return json.loads(self._read("result.json")), str(self.folder / "result.json")
+        path = self._find("result", "json", day)
+        return json.loads(path.read_bytes()), str(path)
 
     def seal(self, day: str) -> SealRecord:
-        return SealRecord(json.loads(self._read("seal.json")), None, None, str(self.folder / "seal.json"))
+        path = self._find("seal", "json", day)
+        return SealRecord(json.loads(path.read_bytes()), None, None, str(path))
 
     def drand(self, round_no: int) -> list[tuple[str, dict]]:
         if (self.folder / "drand.json").is_file():
-            return [(str(self.folder / "drand.json"), json.loads(self._read("drand.json")))]
+            return [(str(self.folder / "drand.json"), json.loads((self.folder / "drand.json").read_bytes()))]
         self.min_drand_sources = 2
         return drand_from_relays(round_no, self.relays)
 

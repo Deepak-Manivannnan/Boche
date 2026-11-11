@@ -9,9 +9,15 @@ import pytest
 from app.main import FRONTEND_DIR
 
 WINNERS = [
-    {"rank": r, "prize": "main" if r <= 3 else "consolation", "ticket": f"AB {r:06d}",
-     "label": {1: "1st prize", 2: "2nd prize", 3: "3rd prize"}.get(r, "Lucky 7"),
-     "amount": {1: 100000, 2: 50000, 3: 25000}.get(r, 10000), "name": "Test C.", "position": r}
+    {
+        "rank": r,
+        "prize": "main" if r <= 3 else "consolation",
+        "ticket": f"AB {r:06d}",
+        "label": {1: "1st prize", 2: "2nd prize", 3: "3rd prize"}.get(r, "Lucky 7"),
+        "amount": {1: 100000, 2: 50000, 3: 25000}.get(r, 10000),
+        "name": "Test C.",
+        "position": r,
+    }
     for r in range(1, 11)
 ]
 
@@ -20,8 +26,11 @@ def plan(winners, mine, *, frame=None):
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed")
-    call = (f"R.scrambleFrame({json.dumps(frame[0])}, {frame[1]}, {frame[2]})" if frame
-            else f"R.plan({json.dumps(winners)}, {json.dumps(mine)})")
+    call = (
+        f"R.scrambleFrame({json.dumps(frame[0])}, {frame[1]}, {frame[2]})"
+        if frame
+        else f"R.plan({json.dumps(winners)}, {json.dumps(mine)})"
+    )
     script = (
         "const vm=require('vm'),fs=require('fs');const c={window:{}};vm.createContext(c);"
         f"vm.runInContext(fs.readFileSync({json.dumps(str(FRONTEND_DIR / 'reveal.js'))},'utf8'),c);"

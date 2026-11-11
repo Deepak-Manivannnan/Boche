@@ -4,7 +4,7 @@ from typing import Annotated
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Path, Request
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy.orm import Session
 
 from app import models as m
@@ -33,27 +33,36 @@ def _closed_day(db: Session, label: str) -> m.DrawDay:
     return day
 
 
+def _download(name: str, label: str) -> dict:
+    """Save as e.g. tickets-2026-11-10.csv; the Verifier accepts that name as well as tickets.csv."""
+    stem, ext = name.split(".")
+    return {"Content-Disposition": f'attachment; filename="{stem}-{label}.{ext}"'}
+
+
 @router.get("/public/days/{label}/tickets.csv")
 def ticket_list(label: Label, db: Db) -> Response:
     day = _closed_day(db, label)
     return Response(
-        day.ticket_csv,
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f'inline; filename="tickets-{day.label}.csv"'},
+        day.ticket_csv, media_type="text/csv; charset=utf-8", headers=_download("tickets.csv", day.label)
     )
 
 
 @router.get("/public/days/{label}/seal.json")
 def seal(label: Label, db: Db) -> Response:
-    return Response(_closed_day(db, label).seal_json.encode("utf-8"), media_type="application/json")
+    day = _closed_day(db, label)
+    return Response(
+        day.seal_json.encode("utf-8"),
+        media_type="application/json",
+        headers=_download("seal.json", day.label),
+    )
 
 
 @router.get("/public/days/{label}/result.json")
-def result(label: Label, db: Db) -> dict:
+def result(label: Label, db: Db) -> JSONResponse:
     day = db.scalar(sa.select(m.DrawDay).where(m.DrawDay.label == label))
     if day is None or day.status != "published":
         raise HTTPException(status_code=404, detail="The result of this Draw day is not published yet")
-    return result_json(db, day)
+    return JSONResponse(result_json(db, day), headers=_download("result.json", day.label))
 
 
 @router.get("/public/days")

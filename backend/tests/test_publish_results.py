@@ -83,10 +83,14 @@ def test_the_public_days_list_carries_each_published_result(w):
 
 def test_a_draw_days_public_files_pass_the_real_verifier(w, tmp_path):
     draw(w, 20, 40)
-    (tmp_path / "tickets.csv").write_bytes(w.arun.get(f"/api/public/days/{DAY}/tickets.csv").content)
-    (tmp_path / "seal.json").write_bytes(w.arun.get(f"/api/public/days/{DAY}/seal.json").content)
-    (tmp_path / "result.json").write_bytes(w.arun.get(RESULT).content)
-    round_no = json.loads((tmp_path / "seal.json").read_text())["drand"]["round"]
+    for name in ("tickets.csv", "seal.json", "result.json"):
+        res = w.arun.get(f"/api/public/days/{DAY}/{name}")
+        # Saved under the browser's download name, e.g. tickets-2026-11-10.csv
+        saved = res.headers["content-disposition"].split('filename="')[1].rstrip('"')
+        assert res.headers["content-disposition"].startswith("attachment")
+        assert saved == name.replace(".", f"-{DAY}.")
+        (tmp_path / saved).write_bytes(res.content)
+    round_no = json.loads(w.arun.get(f"/api/public/days/{DAY}/seal.json").content)["drand"]["round"]
     (tmp_path / "drand.json").write_text(json.dumps(drand_value(round_no)))
     report = verify.verify(DAY, verify.FolderSources(tmp_path))
     assert report.ok, report.render()
