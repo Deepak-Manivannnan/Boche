@@ -58,7 +58,7 @@ The DB tests refuse to run unless the test database's name ends in `_test`, beca
 
 ## Run a full day in test mode
 
-No need to wait for 8 PM. Sign in at `/#/staff` with an email listed in `ADMIN_EMAILS`, open **Tonight's draw**, then:
+No need to wait for 8 PM. Sign in at `/staff` with an email listed in `ADMIN_EMAILS`, open **Tonight's draw**, then:
 
 1. **New test day**, then **Add 15,000 tickets** (20 test customers buy tea through the real paid-order path).
 2. **Close entries now**: the list is frozen, fingerprinted and sealed to GitHub; the Seal names a drand round about 30 s ahead.

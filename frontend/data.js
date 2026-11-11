@@ -83,7 +83,7 @@ var BC_OUTLETS = [
     hours: '12 PM – 11 PM', phone: '+91 495 000 0103', distance: '186 km', rating: 4.4,
     tags: ['Sea view', 'Malabar kitchen'], tone: 'c', ageGate: true, bookable: true, checkinLabel: 'Entry' },
   { id: 'blr', biz: 'pub', kind: 'Pub', name: 'Shakesbierre Brewpub & Club by Boche', city: 'Bengaluru', area: 'Eva Mall, Brigade Road', state: 'KA',
-    hours: '12 PM – 12 AM', phone: '+91 96149 59959', distance: '548 km', rating: 4.7, logo: 'img/shakesbierre.png',
+    hours: '12 PM – 12 AM', phone: '+91 96149 59959', distance: '548 km', rating: 4.7, logo: '/img/shakesbierre.png',
     tags: ['Brewpub', 'Karaoke lounge', 'Live music'], tone: 'd', ageGate: true, bookable: true, checkinLabel: 'Entry' },
   { id: 'mlr', biz: 'pub', kind: 'Pub', name: 'Boche Pub Mangaluru', city: 'Mangaluru', area: 'Lighthouse Hill Road', state: 'KA',
     hours: '12 PM – 11:30 PM', phone: '+91 824 000 0105', distance: '412 km', rating: 4.5,
@@ -232,7 +232,7 @@ var BC_STAFF_UI = {
 var BC_PROMO_CFG = { rotateMs: 5000 };
 var BC_PROMOS = [
   { biz: 'club',   title: 'Win ₹1 lakh every day', art: 'draw', text: 'Every Tea order gets a scratch card for the daily 8 PM Lucky Draw.', cta: 'Lucky Draw', go: 'draw', icon: 'gift' },
-  { biz: 'pub',    title: 'Pub Trail', art: 'pub', logo: 'img/shakesbierre.png',            text: 'Visit 3 Boche pubs this month and earn 1,500 bonus points.', cta: 'Explore pubs', go: 'biz/pub' },
+  { biz: 'pub',    title: 'Pub Trail', art: 'pub', logo: '/img/shakesbierre.png',            text: 'Visit 3 Boche pubs this month and earn 1,500 bonus points.', cta: 'Explore pubs', go: 'biz/pub' },
   { biz: 'resort', title: 'Weekend at 1000 Acre', art: 'resort', text: 'Stay two nights and earn 1,000 bonus points.',                cta: 'View resort',  go: 'biz/resort' },
   { biz: 'club',   title: 'Bring a friend', art: 'friend',       text: 'Earn 500 points when a friend joins and makes a first visit.', cta: 'See offers',   go: 'offers' },
   { biz: 'tea',    title: 'Estate tea, home delivered', art: 'tea', text: 'Every pack comes with Lucky Draw numbers. Delivered anywhere in Kerala.', cta: 'Shop tea', go: 'tea' },

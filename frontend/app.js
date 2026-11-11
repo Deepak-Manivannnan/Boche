@@ -99,7 +99,7 @@
   function eligible(o, id) { var st = ageState(o, id); return st === 'open' || st === 'ok'; }
   function verifyRoute(back) { return 'kyc/' + encodeURIComponent(back); }
   /* Member photo: their own upload, else the supplied member picture (the Boche portrait is brand art, never a member photo) */
-  function memberPhoto() { var p = (S.members[BC_MEMBER.id] || {}).profile || {}; return p.photo || 'img/member.webp'; }
+  function memberPhoto() { var p = (S.members[BC_MEMBER.id] || {}).profile || {}; return p.photo || '/img/member.webp'; }
   function avatarHtml() { var ph = memberPhoto(); return ph ? '<div class="avatar has-photo"><img src="' + esc(ph) + '" alt=""></div>' : '<div class="avatar">' + initials(BC_MEMBER.name) + '</div>'; }
   function photoTag(cls, brandImg) {
     var ph = brandImg || memberPhoto();
@@ -215,7 +215,7 @@
   function cardBack() {
     var C = 2 * Math.PI * 11;
     return '<div class="mcard mback">' +
-      '<div class="mb-left"><div class="qrbox"><div id="qrSvg"></div><span class="qr-logo"><img src="img/portrait.webp" alt=""></span></div>' +
+      '<div class="mb-left"><div class="qrbox"><div id="qrSvg"></div><span class="qr-logo"><img src="/img/portrait.webp" alt=""></span></div>' +
       '<div class="mb-idrow"><span class="mc-label">Member ID</span><b class="mb-id">' + esc(BC_MEMBER.id) + '</b></div></div>' +
       '<div class="mb-right">' + photoTag('mb-photo') + '<div class="mb-name">' + esc(BC_MEMBER.name) + '</div>' +
       '<div class="mb-row"><span class="mb-tier">' + esc(curTier().name) + ' member</span>' +
@@ -237,7 +237,7 @@
       '<h4>' + esc(o.title) + '</h4><p>' + esc(o.desc) + '</p>' +
       '<div class="offer-foot"><div class="offer-meta">' + esc(outletsLabel(o)) + '<br>' + esc(o.valid) + '</div>' +
       (allowed ? '<button class="btn btn-sm ' + (on ? 'btn-soft' : 'btn-gold') + '" data-act="activate" data-id="' + o.id + '">' + (on ? ic('check', 16) + 'Activated' : 'Activate') + '</button>'
-        : '<a class="btn btn-sm btn-line" href="#/tiers">' + ic('lock', 15) + esc(lockTier) + ' & above</a>') + '</div></div>';
+        : '<a class="btn btn-sm btn-line" href="/tiers">' + ic('lock', 15) + esc(lockTier) + ' & above</a>') + '</div></div>';
   }
   function outletCard(o) {
     var under = ageState(o) === 'under', b = biz(o.biz), offers = BC_OFFERS.filter(function (x) { return x.outlets !== 'all' && x.outlets.indexOf(o.id) > -1; });
@@ -261,14 +261,14 @@
   SCREENS.welcome = function () {
     return '<div class="welcome">' +
       '<div class="wl-hero"><div class="wl-mark">BOCHE</div>' +
-      '<div class="wl-cards">' + cardFront('gold', '', false, 'img/portrait.webp') + '</div>' +
+      '<div class="wl-cards">' + cardFront('gold', '', false, '/img/portrait.webp') + '</div>' +
       '<p class="wl-tag">One card. Every Boche experience.</p>' +
       '<div class="wl-perks"><span>' + ic('sparkle', 13) + 'Rewards</span><span>' + ic('gift', 13) + 'Offers</span><span>' + ic('users', 13) + 'Events</span></div></div>' +
       '<div class="wl-sheet"><h1>Welcome</h1>' +
       '<p class="wl-sub">Sign in or join with your Google account</p>' +
       '<div class="gsi-slot" id="gsiBtn"><span class="mini-spin" aria-label="Loading Google sign-in"></span></div>' +
       '<div class="err-text" id="mobErr">' + esc(ui.signInErr || '') + '</div>' +
-      '<p class="wl-legal">Free to join · <a class="link" href="#/verify-draw">Verify past draws</a></p></div></div>';
+      '<p class="wl-legal">Free to join · <a class="link" href="/verify-draw">Verify past draws</a></p></div></div>';
   };
   SCREENS.login = SCREENS.welcome;
   function wireMobile(inpId, btnId, errId, onEnter, noFocus) {
@@ -349,7 +349,7 @@
   }
   function otpScreen(back, mobile, btnAct, extra) {
     return topbar('', back) + '<div class="auth"><h1>Verify OTP</h1>' +
-      '<p class="lead">Sent to +91 ' + esc(mobile.replace(/(\d{5})(\d{5})/, '$1 $2')) + ' · <a class="link" href="#/' + back + '">Change</a></p>' +
+      '<p class="lead">Sent to +91 ' + esc(mobile.replace(/(\d{5})(\d{5})/, '$1 $2')) + ' · <a class="link" href="/' + back + '">Change</a></p>' +
       '<div class="otp mt24" id="otp">' + otpBoxes() + '</div><div class="err-text" id="otpErr"></div>' +
       '<div class="demo-hint">Demo OTP: <b>' + esc(BC_BRAND.demoOtp) + '</b></div>' +
       (extra || '') +
@@ -688,7 +688,7 @@
       '<div class="kv"><span>Member since</span><span>' + esc(BC_MEMBER.memberSince) + '</span></div>' +
       '<div class="kv"><span>Valid thru</span><span>' + esc(BC_MEMBER.validThru) + '</span></div>' +
       '<div class="kv"><span>Home venue</span><span>' + esc(hp.city) + '</span></div>' +
-      '<div class="kv"><span>Age verification</span>' + (kycOf() ? '<span class="pos">Verified</span>' : '<a class="link" href="#/' + verifyRoute('card') + '">Verify</a>') + '</div></div></details></div>';
+      '<div class="kv"><span>Age verification</span>' + (kycOf() ? '<span class="pos">Verified</span>' : '<a class="link" href="/' + verifyRoute('card') + '">Verify</a>') + '</div></div></details></div>';
   };
   function startQr() {
     var left = 30, C = 2 * Math.PI * 11;
@@ -734,7 +734,7 @@
           '<span class="hm-eyebrow">' + esc(o.kind) + ' · ' + esc(o.valid) + '</span>' +
           '<span class="hm-title">' + esc(o.title) + '</span><span class="hm-text">' + esc(o.desc) + '</span>' +
           (allowed ? '<button class="hm-cta" data-act="activate" data-id="' + o.id + '">' + (on ? ic('check', 14) + 'Activated' : 'Activate offer') + '</button>'
-            : '<a class="hm-cta" href="#/tiers">' + ic('lock', 13) + esc(byId(BC_TIERS, o.tiers[0]).name) + ' & above</a>') + '</div>';
+            : '<a class="hm-cta" href="/tiers">' + ic('lock', 13) + esc(byId(BC_TIERS, o.tiers[0]).name) + ' & above</a>') + '</div>';
       }).join('') + '</div><div class="hm-dots" id="promoDots">' + offers.map(function (o, i) { return '<i' + (i ? '' : ' class="on"') + '></i>'; }).join('') + '</div>' : '') +
       '<div class="pad">' +
       '<div class="bz-pts"><div><div class="bz-k">' + esc(b.short) + ' points</div><div class="bz-v">' + num(pts) + '</div>' +
@@ -757,7 +757,7 @@
   var railMemo = {};
   /* Swipeable promo rail with dots; auto-advances until the user touches it */
   function wireRail() {
-    var rail = $('promos'), dots = $('promoDots').children, slides = rail.children, cur = 0, paused = false, key = location.hash;
+    var rail = $('promos'), dots = $('promoDots').children, slides = rail.children, cur = 0, paused = false, key = location.pathname;
     if (slides.length < 2) return;
     if (railMemo[key]) { rail.scrollLeft = railMemo[key]; cur = Math.min(slides.length - 1, Math.round(railMemo[key] / (slides[1].offsetLeft - slides[0].offsetLeft))); Array.prototype.forEach.call(dots, function (d, i) { d.className = i === cur ? 'on' : ''; }); }
     function at() { var step = slides[1].offsetLeft - slides[0].offsetLeft; return step > 0 ? Math.round(rail.scrollLeft / step) : cur; }
@@ -915,12 +915,12 @@
             (o.gst ? gstLines(o.gst) : o.tax ? gstLine(o.tax, o.taxRate) : '') +
             '<div class="kv total"><span>Paid</span><span>' + inr(o.total) + '</span></div>' +
             '<div class="kv"><span>Deliver to</span><span class="ord-addr">' + esc(o.addr.house + ', ' + o.addr.street + ', ' + teaAreaLine({ po: o.area.po, district: o.area.district, pin: o.addr.pin })) + '</span></div>' +
-            '<div class="kv"><span>Lucky Draw</span><a class="link" href="#/my-numbers">' + cards.length + (cards.length === 1 ? ' card' : ' cards') + ' · ' + numsLabel(cards.reduce(function (t, c) { return t + c.nos.length; }, 0)) + '</a></div>' +
+            '<div class="kv"><span>Lucky Draw</span><a class="link" href="/my-numbers">' + cards.length + (cards.length === 1 ? ' card' : ' cards') + ' · ' + numsLabel(cards.reduce(function (t, c) { return t + c.nos.length; }, 0)) + '</a></div>' +
             cards.map(function (c) {
               var cs = cardState(c);
               return '<div class="kv ot-card' + (cs.win ? ' win' : '') + '"><span>' + (c.pack ? esc(c.pack) + ' card' : 'Card') + '</span><span>' +
-                (cs.win ? ic('crown', 13) : '') + esc(cs.t) + (cs.go ? ' · <a class="link" href="#/' + cs.go + '">' + cs.cta + '</a>' : '') +
-                (cs.claim ? ' · <a class="link" href="#/claim/' + c.id + '">Claim</a>' : '') + '</span></div>';
+                (cs.win ? ic('crown', 13) : '') + esc(cs.t) + (cs.go ? ' · <a class="link" href="/' + cs.go + '">' + cs.cta + '</a>' : '') +
+                (cs.claim ? ' · <a class="link" href="/claim/' + c.id + '">Claim</a>' : '') + '</span></div>';
             }).join('') +
             '</div></details>';
         }).join('') + '</div>'
@@ -950,7 +950,7 @@
                 : '<span class="li-s">' + numsLabel(c.nos.length) + ' under the foil</span>') +
               (same ? '' : '<div class="mn-st' + (q.claim ? ' mn-claim' : '') + '"><span>' + (q.win ? ic('crown', 13) : '') + esc(q.t) + '</span>' +
                 (q.claim ? '<button class="btn btn-sm btn-gold" data-act="claimPrize" data-id="' + c.id + '">Claim</button>' : '') + '</div>') + '</div>' +
-              (q.go ? '<a class="btn btn-sm btn-soft" href="#/' + q.go + '">' + q.cta + '</a>' : '') + '</div>';
+              (q.go ? '<a class="btn btn-sm btn-soft" href="/' + q.go + '">' + q.cta + '</a>' : '') + '</div>';
           }).join('') + '</div></div>';
       }).join('') : '<div class="surface sp-empty">' + ic('gift', 18) + '<span>Buy any tea pack to get lucky numbers</span></div>') + '</div>';
   };
@@ -968,7 +968,7 @@
       (rows.length ? '<div class="otable"><div class="wn-row ot-h"><span>#</span><span>Date</span><span>Type</span><span>Lucky No</span><span>Amount</span><span>Status</span></div>' +
         rows.map(function (r, i) {
           var s = st(r.c), d = new Date(r.c.drawDate + 'T12:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-          return '<a class="wn-row wn-item" href="#/claim/' + r.c.id + '"><span>' + (rows.length - i) + '</span><span>' + d + '</span><span>Tea</span><span>' + esc(r.w.no) + '</span><span>' + inr(r.w.amount) + '</span>' +
+          return '<a class="wn-row wn-item" href="/claim/' + r.c.id + '"><span>' + (rows.length - i) + '</span><span>' + d + '</span><span>Tea</span><span>' + esc(r.w.no) + '</span><span>' + inr(r.w.amount) + '</span>' +
             '<span><span class="badge ' + s[1] + (s[0] === 'Claim' ? ' warn' : '') + '">' + s[0] + '</span></span></a>';
         }).join('') + '</div>'
         : '<div class="surface sp-empty">' + ic('crown', 18) + '<span>No wins yet. Your luck is coming</span></div>') + '</div>';
@@ -994,7 +994,7 @@
   SCREENS.tea = function () {
     var t = curTier(), n = teaCount(), b = biz('tea');
     return '<div class="flow tea-page">' + topbar('Boche Tea', 'home') + '<div class="pad">' +
-      '<a class="tea-ban" href="#/draw"><span class="tn-art">' + ic('gift', 70) + '</span><span class="tn-k">' + ic('sparkle', 12) + 'Lucky Draw</span>' +
+      '<a class="tea-ban" href="/draw"><span class="tn-art">' + ic('gift', 70) + '</span><span class="tn-k">' + ic('sparkle', 12) + 'Lucky Draw</span>' +
         '<span class="tn-t">Win up to <b>' + inr(BC_DRAW.prizes[0].amount) + '</b> every day</span><span class="tn-s">Every pack includes a scratch card</span></a>' +
       (function () {
         var seen = ui.teaSeen; setTimeout(function () { ui.teaSeen = true; }, 900);
@@ -1485,7 +1485,7 @@
     REVEAL_STOP = BCREVEAL.play($('device'), {
       winners: winners.map(function (w) { return { rank: w.rank, ticket: w.ticket, name: w.name, label: w.label || prizeLabel(w.rank), amount: w.amount || prizeAmount(w.rank) }; }),
       myNumbers: mine, firstName: BC_MEMBER.firstName, dayLabel: /^\d{4}-/.test(label) ? dayLabel(label) : 'TEST',
-      verifyHref: '#/verify-draw/' + encodeURIComponent(label), confetti: confetti, chime: playChime,
+      verifyHref: '/verify-draw/' + encodeURIComponent(label), confetti: confetti, chime: playChime,
       onDone: function () { REVEAL_STOP = null; if (onDone) onDone(); }
     });
   }
@@ -1499,7 +1499,7 @@
 
   /* ----- Verify the draw (public): every closed Draw day's files, its Seal on GitHub, its drand round, and the Verifier ----- */
   var DRAND_CHAIN = '52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971';
-  function verifyLink(label, inRow) { return '<a class="btn btn-line btn-sm' + (inRow ? '' : ' mt12') + '" href="#/verify-draw/' + encodeURIComponent(label) + '">' + ic('shield', 15) + 'Verify this draw</a>'; }
+  function verifyLink(label, inRow) { return '<a class="btn btn-line btn-sm' + (inRow ? '' : ' mt12') + '" href="/verify-draw/' + encodeURIComponent(label) + '">' + ic('shield', 15) + 'Verify this draw</a>'; }
   SCREENS['verify-draw'] = function (focus) {
     var days = PUBLIC_DAYS, api = '/api/public/days/';
     function dl(href, text) { return '<a class="link" href="' + esc(href) + '" target="_blank" rel="noopener">' + esc(text) + '</a>'; }
@@ -1760,12 +1760,12 @@
   function onAdminCredential(resp) {
     var slot = $('gsiAdmin'); if (slot) slot.innerHTML = '<span class="mini-spin" aria-label="Signing in"></span>';
     ui.adminErr = '';
-    BCAPI.post('/auth/google', { credential: resp.credential }).then(function (u) {
+    BCAPI.post('/auth/google', { credential: resp.credential, admin: true }).then(function (u) {
       ME = u; applyProfile(); SES.authed = true; SES.pending = null; saveSes(); refreshOrders(true);
       if (u.role === 'admin') { ui.adm = null; go('admin-draw'); }
       else { ui.adminErr = 'This Google account is not a Lucky Draw admin.'; rerender(); }
     }).catch(function (e) {
-      ui.adminErr = e.status === 503 ? 'Google sign-in is unavailable right now. Please try again.' : 'Sign-in failed. Please try again.';
+      ui.adminErr = e.status === 403 ? 'This Google account is not a Lucky Draw admin.' : e.status === 503 ? 'Google sign-in is unavailable right now. Please try again.' : 'Sign-in failed. Please try again.';
       rerender();
     });
   }
@@ -2343,8 +2343,9 @@
   var TAB_OF = { tea: 'home', 'tea-orders': 'home', draw: 'draw', 'my-numbers': 'draw', 'my-wins': 'draw', activity: 'profile', scratch: 'draw', 'tea-done': 'home' };
   var timers = [];
   function clearTimers() { timers.forEach(function (t) { clearInterval(t); clearTimeout(t); }); timers = []; }
-  function parse() { var p = (location.hash || '').replace(/^#\/?/, '').split('/'); return { name: p[0] || '', arg: decodeURIComponent(p[1] || '') }; }
-  function go(path) { if (location.hash === '#/' + path) render(); else location.hash = '#/' + path; }
+  /* Clean URLs (/draw, /verify-draw/2026-11-10) through the History API; the server returns the app for any of them */
+  function parse() { var p = location.pathname.replace(/^\/+/, '').split('/'); return { name: p[0] || '', arg: decodeURIComponent(p[1] || '') }; }
+  function go(path) { var url = '/' + path; if (location.pathname !== url) history.pushState(null, '', url); render(); }
   function resolve(r) {
     if (STAFF_PUBLIC[r.name]) return SES.staffId ? { name: 'scan', arg: '' } : r;
     if (STAFF_APP[r.name]) return SES.staffId ? r : { name: 'staff', arg: '' };
@@ -2366,7 +2367,7 @@
   /* In-app history so Back returns to the screen the member came from, not a fixed parent */
   var navStack = [];
   function trackNav() {
-    var h = location.hash || '#/';
+    var h = location.pathname;
     if (navStack[navStack.length - 1] === h) return;
     if (navStack[navStack.length - 2] === h) navStack.pop(); else navStack.push(h);
   }
@@ -2433,10 +2434,18 @@
     var a = e.target.closest('[data-act]');
     if (a && !a.disabled && ACTIONS[a.dataset.act]) { e.preventDefault(); e.stopPropagation(); ACTIONS[a.dataset.act](a); return; }
     var g = e.target.closest('[data-go]');
-    if (g && !g.disabled) { e.preventDefault(); go(g.dataset.go); }
+    if (g && !g.disabled) { e.preventDefault(); go(g.dataset.go); return; }
+    /* In-app links (<a href="/tiers">) change screens without reloading; files, API and new-tab links load normally */
+    var l = e.target.closest('a[href^="/"]');
+    if (l && !l.target && !l.hasAttribute('download') && l.getAttribute('href').indexOf('/api/') !== 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+      e.preventDefault(); go(l.getAttribute('href').slice(1));
+    }
   });
   $('sheetBackdrop').addEventListener('click', function () { closeSheet(); });
-  window.addEventListener('hashchange', function () { render(); });
+  window.addEventListener('popstate', function () { render(); });
+  /* Old links (/#/verify-draw) and /index.html open at their clean URL */
+  if (location.hash.indexOf('#/') === 0) history.replaceState(null, '', '/' + location.hash.slice(2));
+  else if (location.pathname === '/index.html') history.replaceState(null, '', '/');
   /* Another tab (member app / Business Admin) changed shared data → refresh this one */
   window.addEventListener('storage', function (e) {
     if (e.key !== LS_KEY || !e.newValue) return;
@@ -2451,8 +2460,8 @@
   var deferredPrompt = null;
   window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferredPrompt = e; });
   if (/^https?:$/.test(location.protocol)) {
-    var lk = document.createElement('link'); lk.rel = 'manifest'; lk.href = 'manifest.json'; document.head.appendChild(lk);
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
+    var lk = document.createElement('link'); lk.rel = 'manifest'; lk.href = '/manifest.json'; document.head.appendChild(lk);
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function () {});
   }
 
   /* Boot: the server decides who is signed in. 401 means signed out; a network error (offline) keeps the

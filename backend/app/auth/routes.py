@@ -17,6 +17,7 @@ Db = Annotated[Session, Depends(get_db)]
 
 class GoogleSignIn(BaseModel):
     credential: str = Field(min_length=20, max_length=8192)  # the ID token from Google Identity Services
+    admin: bool = False  # signing in on the staff page: only accounts in ADMIN_EMAILS may sign in there
 
 
 @router.get("/config")
@@ -32,6 +33,10 @@ def sign_in_with_google(body: GoogleSignIn, request: Request, response: Response
         raise HTTPException(status_code=503, detail="Google sign-in is unavailable right now") from e
     except AuthError as e:
         raise HTTPException(status_code=401, detail="Google sign-in failed") from e
+
+    if body.admin and who.email not in request.app.state.settings.admin_emails:
+        # Staff page: no customer account or session is created for someone who is not an Admin.
+        raise HTTPException(status_code=403, detail="This Google account is not a Lucky Draw admin")
 
     # Match on Google's stable account id; an existing row with the same verified email is the same person.
     user = db.scalar(sa.select(m.User).where(m.User.google_sub == who.sub))

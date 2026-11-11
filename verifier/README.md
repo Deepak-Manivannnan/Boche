@@ -20,7 +20,7 @@ If the folder also holds `drand.json`, the randomness is read from it. Otherwise
 
 Options: `--site URL` (default `https://boche.onrender.com`) and `--seals-repo owner/repo` (default `Deepak-Manivannnan/boche-draw-seals`, the public GitHub repository of Seals).
 
-You can also download `verify.py` from the app's **Verify the draw** page (`https://boche.onrender.com/#/verify-draw`), which lists every closed Draw day with its files, its Seal on GitHub and its drand round.
+You can also download `verify.py` from the app's **Verify the draw** page (`https://boche.onrender.com/verify-draw`), which lists every closed Draw day with its files, its Seal on GitHub and its drand round.
 
 ## What it checks
 

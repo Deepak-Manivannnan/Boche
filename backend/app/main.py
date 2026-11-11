@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import sessionmaker
 from starlette.concurrency import run_in_threadpool
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.auth.google import GoogleTokenVerifier, Sessions
 from app.core.clock import Clock, SystemClock
@@ -111,8 +112,22 @@ def create_app(
     app.include_router(admin_router)
 
     # Mounted last so every /api route above takes precedence over static files.
-    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+    app.mount("/", AppFiles(directory=FRONTEND_DIR, html=True), name="frontend")
     return app
+
+
+class AppFiles(StaticFiles):
+    """Static files, plus index.html for app routes such as /draw or /verify-draw/2026-11-10, so the
+    browser can show clean URLs. API paths and paths that look like files still get a real 404."""
+
+    async def get_response(self, path: str, scope):
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as e:
+            last = path.rsplit("/", 1)[-1]
+            if e.status_code != 404 or path.startswith("api") or "." in last:
+                raise
+            return await super().get_response("index.html", scope)
 
 
 def _minimal_settings(database_url: str) -> Settings:
