@@ -1646,9 +1646,15 @@ a.link, a.btn { text-decoration: none; }
 .wl-r { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto 76px; align-items: center; gap: 10px; padding: 11px 14px; }
 .wl-r + .wl-r { border-top: 1px solid var(--line); }
 .wl-r.me { background: #F2FAF4; }
-.wl-p { justify-self: center; min-width: 36px; height: 24px; padding: 0 6px; border-radius: 12px; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--ink-2); background: var(--gold-bg); border: 1px solid var(--line); font-variant-numeric: tabular-nums; }
 .wl-n { font-size: 14px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wl-t { justify-self: end; }
 .wl-a { justify-self: end; font-size: 14px; font-variant-numeric: tabular-nums; }
 .dw-v.sm { font-size: 22px; }
-.wl-m { justify-self: center; display: block; line-height: 0; margin: -4px 0 -2px; }
+.wl-p { justify-self: center; min-width: 36px; height: 24px; padding: 0 6px; border-radius: 12px; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--ink-2); background: var(--gold-bg); border: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+/* Top three: struck-metal coins in the app's gold palette — a bevelled rim, a domed face, a soft sheen */
+.wl-p.gold, .wl-p.silver, .wl-p.bronze { width: 34px; min-width: 34px; height: 34px; padding: 0; border-radius: 50%; border: 0; font-family: var(--serif); font-size: 12px; font-weight: 700; letter-spacing: -.01em; position: relative; text-shadow: 0 1px 0 rgba(255,255,255,.45); }
+.wl-p.gold::after, .wl-p.silver::after, .wl-p.bronze::after { content: ''; position: absolute; inset: 3px; border-radius: 50%; border: 1px solid rgba(255,255,255,.5); box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); pointer-events: none; }
+.wl-p.gold { color: #4A3408; background: radial-gradient(circle at 32% 28%, #FFF4CF 0 12%, #E8C873 34%, #C9A04A 62%, #8C6420 100%); box-shadow: 0 0 0 1.5px #8C6420, 0 2px 4px rgba(94,66,20,.28), inset 0 -2px 3px rgba(94,66,20,.35); }
+.wl-p.silver { color: #30343A; background: radial-gradient(circle at 32% 28%, #FFFFFF 0 12%, #E3E5E8 34%, #B9BEC4 62%, #7E848C 100%); box-shadow: 0 0 0 1.5px #7E848C, 0 2px 4px rgba(46,50,56,.22), inset 0 -2px 3px rgba(46,50,56,.3); }
+.wl-p.bronze { color: #3F230D; background: radial-gradient(circle at 32% 28%, #FBE1C6 0 12%, #DDA575 34%, #B87843 62%, #7E4A20 100%); box-shadow: 0 0 0 1.5px #7E4A20, 0 2px 4px rgba(63,35,13,.26), inset 0 -2px 3px rgba(63,35,13,.32); }
+.wl-c { grid-column: 2 / -1; justify-self: end; margin-top: -2px; }

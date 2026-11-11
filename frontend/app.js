@@ -1240,7 +1240,8 @@
   function drawResults(key) {
     var list = RESULTS[key]; if (!list) return null;
     var mine = myNumbers();
-    return list.map(function (w, i) { var n = +w.rank || i + 1; return { place: n, rank: n + ({ 1: 'st', 2: 'nd', 3: 'rd' }[n] || 'th') + ' prize', amount: w.amount, no: w.ticket, name: w.name, mob: w.mobile, member: mine[w.ticket] ? BC_MEMBER.id : null }; });
+    var cardOf = {}; allCards().forEach(function (x) { x.c.nos.forEach(function (no) { cardOf[no] = x.c; }); });
+    return list.map(function (w, i) { var n = +w.rank || i + 1; return { card: cardOf[w.ticket] || null, place: n, rank: n + ({ 1: 'st', 2: 'nd', 3: 'rd' }[n] || 'th') + ' prize', amount: w.amount, no: w.ticket, name: w.name, mob: w.mobile, member: mine[w.ticket] ? BC_MEMBER.id : null }; });
   }
   function refreshResults(force) {
     if (!force && Date.now() - resultsAt < 15000) return Promise.resolve();
@@ -1428,29 +1429,20 @@
     cv.addEventListener('pointercancel', function () { down = false; });
   };
 
-  /* A medal on a ribbon for the top three: gold, silver, bronze, with the place written on the disc */
-  function medal(place, ord) {
-    var c = { 1: ['#F7E3A1', '#D9B45A', '#9C7224', '#3B2A0C'], 2: ['#F6F7F8', '#C3C7CC', '#8D9299', '#2B2F35'], 3: ['#F3D3B3', '#C98A55', '#8E5427', '#341E0C'] }[place];
-    var r = { 1: '#B3261E', 2: '#2E5C9A', 3: '#2F7A4C' }[place], g = 'md' + place;
-    return '<span class="wl-m" aria-label="' + ord + ' prize"><svg viewBox="0 0 40 44" width="34" height="38" aria-hidden="true">' +
-      '<defs><linearGradient id="' + g + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + c[0] + '"/><stop offset=".55" stop-color="' + c[1] + '"/><stop offset="1" stop-color="' + c[2] + '"/></linearGradient></defs>' +
-      '<path d="M11 0h7l5 13h-7z" fill="' + r + '"/><path d="M29 0h-7l-5 13h7z" fill="' + r + '" opacity=".8"/>' +
-      '<circle cx="20" cy="28" r="14" fill="url(#' + g + ')" stroke="' + c[2] + '" stroke-width="1.5"/><circle cx="20" cy="28" r="10.5" fill="none" stroke="#fff" stroke-opacity=".55"/>' +
-      '<text x="20" y="32" text-anchor="middle" font-size="10.5" font-weight="800" fill="' + c[3] + '" font-family="DM Sans, sans-serif">' + ord + '</text></svg></span>';
-  }
-
   SCREENS.draw = function () {
     var today = dayKey(), res = drawResults(today), mine = allCards().map(function (x) { return x.c; });
     var pending = mine.filter(function (c) { return !c.submitted; });
     var nosFor = function (pred) { return mine.filter(pred).reduce(function (t, c) { return t.concat(c.nos); }, []); };
     var todayNos = nosFor(function (c) { return c.submitted && c.drawDate === today; });
     var nextNos = nosFor(function (c) { return c.submitted && c.drawDate > today; });
-    function winners(list) {
+    function winners(list, claim) {
       return '<div class="wl">' + list.map(function (w) {
         var me = w.member === BC_MEMBER.id, ord = w.place + ({ 1: 'st', 2: 'nd', 3: 'rd' }[w.place] || 'th');
-        return '<div class="wl-r' + (me ? ' me' : '') + '">' + (w.place <= 3 ? medal(w.place, ord) : '<span class="wl-p">' + ord + '</span>') +
+        var medal = { 1: ' gold', 2: ' silver', 3: ' bronze' }[w.place] || '';
+        var act = me && claim && w.card ? (w.card.claimed ? '<span class="badge plain">Claimed</span>' : '<button class="btn btn-sm btn-gold" data-act="claimPrize" data-id="' + esc(w.card.id) + '">Claim</button>') : '';
+        return '<div class="wl-r' + (me ? ' me' : '') + '"><span class="wl-p' + medal + '" aria-label="' + ord + ' prize">' + ord + '</span>' +
           '<span class="wl-n">' + esc(w.name) + (me ? ' <span class="badge ok">You</span>' : '') + '</span>' +
-          '<span class="lno wl-t">' + esc(w.no) + '</span><b class="wl-a">' + inr(w.amount) + '</b></div>';
+          '<span class="lno wl-t">' + esc(w.no) + '</span><b class="wl-a">' + inr(w.amount) + '</b>' + (act ? '<span class="wl-c">' + act + '</span>' : '') + '</div>';
       }).join('') + '</div>';
     }
     /* Today's winners are listed above, so the calendar covers the 30 days before today. Nothing is selected
@@ -1477,7 +1469,7 @@
         return '<button class="alert alert-btn" data-go="scratch/' + c.id + '">' + ic('sparkle', 18) + '<span>' + (c.scratched ? 'Enter your ' + numsLabel(c.nos.length) : 'Scratch card to open · ' + numsLabel(c.nos.length)) + '</span>' + ic('chev', 16) + '</button>';
       }).join('') : '') +
       '<div class="sec-h" style="padding:0;margin-top:22px"><h3>Today · ' + esc(new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })) + '</h3></div>' +
-      (res ? winners(res) + verifyLink(today)
+      (res ? winners(res, true) + verifyLink(today)
         : '<div class="surface draw-wait"><div class="dw-k" id="drawCdK">Results in</div><div class="dw-v" id="drawCd"></div>' +
           '<div class="li-s">' + (todayNos.length ? 'Your ' + (todayNos.length > 1 ? todayNos.length + ' numbers' : 'number') + ' in today’s draw' : 'No entries from you yet. Order tea to get a scratch card.') + '</div>' +
           (todayNos.length ? '<div class="chips mt8">' + todayNos.map(function (no) { return '<span class="lno big">' + esc(no) + '</span>'; }).join('') + '</div>' : '') +
@@ -1518,7 +1510,7 @@
     });
   }
   function maybeReveal() {
-    var key = dayKey(), list = RESULTS[key], seen = 'bocheclub-reveal-' + key;
+    var key = dayKey(), list = RESULTS[key], seen = 'bocheclub-reveal-' + key + '-' + ((ME && (ME.id || ME.email)) || 'guest');
     if (!list || REVEAL_STOP) return;
     try { if (localStorage.getItem(seen)) return; localStorage.setItem(seen, '1'); } catch (e) { return; }
     var mine = allCards().filter(function (x) { return x.c.drawDate === key; }).reduce(function (t, x) { return t.concat(x.c.nos); }, []);
