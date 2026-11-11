@@ -26,12 +26,12 @@ You can also download `verify.py` from the app's **Verify the draw** page (`http
 
 | Check | Evidence it uses | What a failure means |
 |---|---|---|
-| Seal is for this Draw day | The Seal file | Wrong day, unknown algorithm or a different drand chain |
-| Seal was published on GitHub before the draw and never changed | GitHub's commit history for the Seal file | The Seal was written after the randomness was public, or it was edited |
-| Ticket list matches the Seal | SHA-256 of the downloaded `tickets.csv` against the Seal's Fingerprint | A Ticket was added, removed or changed after Entries closed |
-| Randomness round was still unknown when Entries closed | drand's fixed schedule (genesis time + 3 s per round) | The Seal named a round whose value was already public |
-| Randomness matches drand | The round fetched from **at least two** independent drand relays | The result used randomness drand never produced |
-| Recomputed Winners match the published Winners | This script's own copy of the draw algorithm | The published Winners are not what the algorithm picks |
+| Seal | The Seal file | Wrong day, unknown algorithm or a different drand chain |
+| Seal on GitHub | GitHub's commit history for the Seal file | The Seal was written after the randomness was public, or it was edited |
+| Ticket list | SHA-256 of the downloaded `tickets.csv` against the Seal's Fingerprint | A Ticket was added, removed or changed after Entries closed |
+| Randomness timing | drand's fixed schedule (genesis time + 3 s per round) | The Seal named a round whose value was already public |
+| Randomness value | The round fetched from **at least two** independent drand relays | The result used randomness drand never produced |
+| Winners | This script's own copy of the draw algorithm | The published Winners are not what the algorithm picks |
 
 ## The algorithm (boche-draw-v1)
 

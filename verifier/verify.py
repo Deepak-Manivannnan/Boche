@@ -24,7 +24,7 @@ import sys
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 SCHEME = "boche-draw-v1"
@@ -46,14 +46,56 @@ DRAND_RELAYS = [
 DEFAULT_SITE = "https://boche.onrender.com"
 DEFAULT_SEALS_REPO = "Deepak-Manivannnan/boche-draw-seals"
 
-# Check names, in the order they run
-FILES = "Public files downloaded"
-SEAL = "Seal is for this Draw day"
-SEAL_PROVENANCE = "Seal was published on GitHub before the draw and never changed"
-TICKET_LIST = "Ticket list matches the Seal"
-ROUND_AFTER_SEAL = "Randomness round was still unknown when Entries closed"
-RANDOMNESS = "Randomness matches drand"
-WINNERS = "Recomputed Winners match the published Winners"
+# Checks, in the order they run. Each has a short name and a plain sentence for pass and for fail.
+FILES = "Files"
+SEAL = "Seal"
+SEAL_PROVENANCE = "Seal on GitHub"
+TICKET_LIST = "Ticket list"
+ROUND_AFTER_SEAL = "Randomness timing"
+RANDOMNESS = "Randomness value"
+WINNERS = "Winners"
+
+MEANING = {
+    FILES: ("all three files were found", "a file is missing, so nothing could be checked"),
+    SEAL: (
+        "the Seal is for this Draw day and this algorithm",
+        "the Seal is for another day or algorithm, or is damaged",
+    ),
+    SEAL_PROVENANCE: (
+        "the Seal was on GitHub before the randomness existed, and was never edited",
+        "the Seal was published late or edited afterwards",
+    ),
+    TICKET_LIST: (
+        "the ticket list is exactly the one sealed when entries closed (nothing added, removed or changed)",
+        "the ticket list is NOT the one sealed when entries closed: a ticket was added, removed or changed",
+    ),
+    ROUND_AFTER_SEAL: (
+        "the random number did not exist yet when entries closed, so nobody could pick tickets to suit it",
+        "the random number was already public when entries closed, so the list could be chosen to suit it",
+    ),
+    RANDOMNESS: (
+        "the random number used is drand's real value for the sealed round",
+        "the random number used is NOT drand's value for the sealed round",
+    ),
+    WINNERS: (
+        "re-running the draw gives exactly the published winners, in the same order",
+        "re-running the draw gives DIFFERENT winners from the published ones",
+    ),
+}
+WARN_MEANING = {
+    SEAL_PROVENANCE: "not checked offline: open the Seal's commit history on GitHub to confirm it"
+}
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def when(t: datetime) -> str:
+    """A time in IST (the draw's time zone) with UTC alongside."""
+    local = t.astimezone(IST)
+    return (
+        f"{local:%d %b %Y} {local:%I:%M:%S %p}".replace(" 0", " ")
+        + f" IST ({t.astimezone(UTC):%H:%M:%S} UTC)"
+    )
 
 
 # --------------------------------------------------------------------------------------------
@@ -258,21 +300,35 @@ class Report:
     def skip(self, *names: str) -> None:
         for name in names:
             if all(c.name != name for c in self.checks):
-                self.checks.append(Check(name, "SKIP", "not checked because an earlier check failed"))
+                self.checks.append(Check(name, "SKIP", ""))
 
     def render(self) -> str:
         lines = [f"Boche Lucky Draw Verifier ({SCHEME}) - Draw day {self.draw_day}", ""]
         for c in self.checks:
-            lines.append(f"[{c.status}] {c.name}")
-            lines.extend(f"       {part}" for part in c.detail.splitlines())
+            if c.status == "PASS":
+                verdict = "OK: " + MEANING[c.name][0]
+            elif c.status == "FAIL":
+                verdict = "PROBLEM: " + MEANING[c.name][1]
+            elif c.status == "WARN":
+                verdict = "NOTE: " + WARN_MEANING.get(c.name, "could not be checked")
+            else:
+                verdict = "not checked because an earlier check failed"
+            lines.append(f"[{c.status}] {c.name} - {verdict}")
+            if c.status != "SKIP":
+                lines.extend(f"       {part}" for part in c.detail.splitlines())
         lines.append("")
         if self.ok:
+            lines.append("RESULT: VERIFIED")
             lines.append(
-                "RESULT: VERIFIED. The published Winners follow from the sealed Ticket list and drand."
+                "  The published winners are exactly what the draw algorithm picks from the ticket list"
             )
+            lines.append("  sealed when entries closed and drand's random number. Nothing was changed.")
         else:
             failed = self.first_failure()
-            lines.append(f"RESULT: NOT VERIFIED. First failure: {failed.name if failed else 'incomplete'}")
+            lines.append("RESULT: NOT VERIFIED")
+            if failed:
+                lines.append(f"  {failed.name}: {MEANING[failed.name][1]}.")
+            lines.append("  This draw's published result cannot be trusted as it stands.")
         return "\n".join(lines)
 
 
@@ -328,7 +384,7 @@ def verify(day: str, sources) -> Report:
         report.add(
             SEAL_PROVENANCE,
             True,
-            "offline mode: check the Seal's commit history on GitHub yourself",
+            "offline mode (--from-dir)",
             warn=True,
         )
     else:
@@ -336,8 +392,8 @@ def verify(day: str, sources) -> Report:
         report.add(
             SEAL_PROVENANCE,
             ok,
-            f"first committed {record.published_at:%Y-%m-%d %H:%M:%S} UTC, {record.revisions} revision(s); "
-            f"randomness released {released:%Y-%m-%d %H:%M:%S} UTC",
+            f"Seal first committed  {when(record.published_at)}, {record.revisions} revision(s)\n"
+            f"randomness released   {when(released)}",
         )
 
     # 3. The downloaded Ticket list is exactly the sealed one.
@@ -367,8 +423,9 @@ def verify(day: str, sources) -> Report:
     report.add(
         ROUND_AFTER_SEAL,
         released > sealed_at,
-        f"Entries closed {sealed_at.astimezone(UTC):%Y-%m-%d %H:%M:%S} UTC; "
-        f"round {sealed_round} released {released:%Y-%m-%d %H:%M:%S} UTC",
+        f"entries closed (Seal made)  {when(sealed_at)}\n"
+        f"drand round {sealed_round} released  {when(released)}"
+        f"  ({int((released - sealed_at).total_seconds()):,} s later)",
     )
 
     # 5. The randomness used is drand's real value for the sealed round.

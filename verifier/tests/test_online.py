@@ -87,7 +87,8 @@ def test_command_line_exits_zero_for_a_genuine_draw_and_one_for_a_tampered_one(d
         [sys.executable, script, DAY, "--from-dir", draw.folder], capture_output=True, text=True
     )
     assert bad.returncode == 1
-    assert "RESULT: NOT VERIFIED. First failure: Ticket list matches the Seal" in bad.stdout
+    assert "RESULT: NOT VERIFIED" in bad.stdout
+    assert "Ticket list: the ticket list is NOT the one sealed" in bad.stdout
 
 
 @pytest.mark.network
