@@ -1610,3 +1610,17 @@ a.hm-cta, .hm-cta { min-height: 30px; }
 @media (prefers-reduced-motion: reduce) { .rv, .rv-count, .rv-place, .rv-no, .rv-no.done, .rv-balloons i, .rv-matrix i, .rv-rays, .rv-sparkle i, .rv-ladder i, .rv-burst b { animation: none; } }
 /* A button whose request is still running (api.js) */
 .btn.is-busy, button.is-busy { opacity: .55; pointer-events: none; cursor: progress; }
+/* Reveal: the Lucky 7 grid, the sound toggle; links never underlined */
+.rv-grid { display: flex; flex-direction: column; gap: 7px; max-width: 340px; margin: 0 auto; }
+.rv-gr { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-radius: 10px; border: 1px solid rgba(217, 180, 90, .18); transition: background .3s, border-color .3s; }
+.rv-gr.done { background: rgba(217, 180, 90, .1); border-color: rgba(217, 180, 90, .45); animation: rv-lock .4s ease-out; }
+.rv-gr.mine { border-color: #fff; box-shadow: 0 0 18px rgba(217, 180, 90, .6); }
+.rv-gp { width: 34px; font: 700 13px var(--font); color: var(--gold-l); text-align: left; }
+.rv-no.sm { padding: 0; border: 0; background: none; gap: 2px; box-shadow: none; animation: none; }
+.rv-no.sm span { width: 19px; padding: 4px 0; font-size: 17px; border-radius: 4px; }
+.rv-no.sm s { width: 5px; }
+.rv-gw { flex: 1; min-width: 0; text-align: right; font-size: 12px; color: rgba(243, 230, 196, .8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rv-gw .rv-you { font-size: 14px; }
+.rv-snd { position: absolute; top: 14px; right: 84px; z-index: 5; background: rgba(0, 0, 0, .3); color: var(--gold-xl); border: 1px solid rgba(217, 180, 90, .4); border-radius: 999px; padding: 6px 12px; font: 600 13px var(--font); cursor: pointer; }
+.rv-ladder { right: 150px; }
+a.link, a.btn { text-decoration: none; }
