@@ -1790,6 +1790,10 @@
     var A = ui.adm = ui.adm || { days: null, sel: null, loadedAt: 0 };
     A.loadedAt = Date.now();
     return BCAPI.get('/admin/draw-days').then(function (days) {
+      (A.days || []).forEach(function (o) {
+        var n = days.filter(function (x) { return x.label === o.label; })[0];
+        if (o.seeding && o.seeding.running && n && n.seeding && !n.seeding.running) toast(n.seeding.error || num(n.seeding.done) + ' tickets added');
+      });
       A.days = days;
       if (!days.some(function (d) { return d.label === A.sel; })) {
         A.sel = (days.filter(function (d) { return d.status === 'sealed'; })[0] || days[0] || {}).label || null;
@@ -1808,7 +1812,7 @@
       '<button class="btn btn-line btn-sm" data-act="admNewTest">' + ic('plus', 15) + 'New test day</button></div>';
     if (!d) return head + '<div class="pad mt16"><div class="surface sp-empty">' + ic('calendar', 18) + '<span>No draw days yet. A day appears when its first card is entered.</span></div>' + testPanel + '</div>';
     var st = ADM_STATUS[d.status] || [d.status, 'plain'], body;
-    var seeding = A.seeding && A.seeding.label === d.label ? A.seeding : null;
+    var seeding = d.seeding && d.seeding.running ? d.seeding : null;
     if (d.status === 'open' && d.kind === 'test') body = '<div class="btn-row mt16"><button class="btn btn-line" data-act="admSeed"' + (seeding ? ' disabled' : '') + '>' + (seeding ? 'Adding… ' + num(seeding.done) + ' / ' + num(seeding.target) : 'Add 5,000 tickets') + '</button>' +
       '<button class="btn btn-gold" data-act="admClose"' + (seeding || !d.ticketCount ? ' disabled' : '') + '>Close entries now</button></div>' +
       '<p class="fine center">Tickets are bought by 20 test customers through the real paid-order path. Closing seals the list and picks a drand round about 30 s ahead.</p>';
@@ -1823,7 +1827,7 @@
         return '<div class="li win"><div class="li-main"><div class="li-t">' + x.rank + ({ 1: 'st', 2: 'nd', 3: 'rd' }[x.rank] || 'th') + ' prize</div><div class="li-s">Position ' + x.position + ' in the list</div></div><div class="win-r"><span class="lno">' + esc(x.ticket) + '</span></div></div>';
       }).join('') + '</div><p class="fine center mt12">Results go public at ' + istTime(d.publishNotBefore) + '.</p>';
     return head + '<div class="pad"><div class="field-l" style="margin-top:16px">Draw day</div><div class="chips scroll-x">' + A.days.map(function (x) {
-        return '<button class="chip' + (x.label === A.sel ? ' on' : '') + '" data-act="admPick" data-id="' + esc(x.label) + '">' + esc(x.label) + (x.kind === 'test' ? ' · TEST' : '') + '</button>';
+        return '<button class="chip' + (x.label === A.sel ? ' on' : '') + '" data-act="admPick" data-id="' + esc(x.label) + '">' + (x.kind === 'test' ? 'Test ' + esc(x.label.replace(/^test-/, '')) : esc(x.label)) + '</button>';
       }).join('') + '</div>' +
       '<div class="surface mt12" style="padding:4px 16px">' +
       '<div class="kv"><span>Status</span><span><span class="badge ' + st[1] + '">' + st[0] + '</span>' + (d.kind === 'test' ? ' <span class="badge warn">TEST</span>' : '') + '</span></div>' +
@@ -1837,7 +1841,7 @@
   AFTER['admin-draw'] = function () {
     if (!ui.adm || !ui.adm.days || Date.now() - ui.adm.loadedAt > 10000) admLoad();
     if ($('otp')) wireOtp(function () { ACTIONS.admRun(); });
-    else { var dd = admDay(); timers.push(setInterval(function () { if (!$('otp') && !(ui.adm && ui.adm.seeding)) admLoad(); }, dd && dd.status === 'sealed' && !dd.canRequestOtp ? 3000 : 15000)); }
+    else { var dd = admDay(); timers.push(setInterval(function () { if (!$('otp')) admLoad(); }, dd && dd.seeding && dd.seeding.running ? 1500 : dd && dd.status === 'sealed' && !dd.canRequestOtp ? 3000 : 15000)); }
   };
 
   SCREENS['staff-otp'] = function () { return otpScreen('staff', ui.staffMobile, 'verifyStaffOtp'); };
@@ -1961,17 +1965,12 @@
       BCAPI.post('/admin/test-days').then(function (day) { ui.adm.busy = false; ui.adm.sel = day.label; return admLoad().then(rerender); },
         function (e) { ui.adm.busy = false; toast(e.message || 'Could not create a test day'); });
     },
-    /* 5,000 tickets in batches of 2,500 so every request stays short */
+    /* One click = one server job of exactly 5,000 tickets; refreshing the page cannot add more */
     admSeed: function () {
-      var d = admDay(); if (!d || ui.adm.seeding) return;
-      var S2 = ui.adm.seeding = { label: d.label, done: 0, target: 5000 };
-      (function next() {
-        if (S2.done >= S2.target) { ui.adm.seeding = null; toast(num(S2.target) + ' tickets added'); admLoad().then(rerender); return; }
-        BCAPI.post('/admin/test-days/' + encodeURIComponent(S2.label) + '/seed', { count: Math.min(2500, S2.target - S2.done) }).then(function () {
-          S2.done = Math.min(S2.target, S2.done + 2500); if (parse().name === 'admin-draw') rerender(); next();
-        }, function (e) { ui.adm.seeding = null; toast(e.message || 'Seeding stopped'); admLoad().then(rerender); });
-      })();
-      rerender();
+      var d = admDay(); if (!d || (d.seeding && d.seeding.running)) return;
+      BCAPI.post('/admin/test-days/' + encodeURIComponent(d.label) + '/seed-job', { count: 5000 }).then(function (job) {
+        d.seeding = job; rerender(); admLoad();
+      }, function (e) { toast(e.message || 'Could not add tickets'); admLoad(); });
     },
     admClose: function () {
       var d = admDay(); if (!d || ui.adm.busy) return; ui.adm.busy = true;

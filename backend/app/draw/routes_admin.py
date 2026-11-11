@@ -2,6 +2,7 @@
 
 There is deliberately no endpoint that redraws, edits or rejects Winners."""
 
+import threading
 from datetime import timedelta
 from typing import Annotated
 
@@ -16,7 +17,7 @@ from app.draw.drand import round_released_at
 from app.draw.drawrun import DrawRefused, run_draw
 from app.draw.lifecycle import publish_results, publish_seals
 from app.draw.otp import OtpRefused, active_expiry, request_otp
-from app.draw.testmode import TestModeRefused, close_test_day, create_test_day, seed_tickets
+from app.draw.testmode import TestModeRefused, close_test_day, create_test_day, seed_tickets, test_day
 
 router = APIRouter(prefix="/api/admin")
 Db = Annotated[Session, Depends(get_db)]
@@ -25,6 +26,32 @@ Label = Annotated[str, Path(pattern=r"^[A-Za-z0-9-]{1,40}$")]
 
 class OtpEntry(BaseModel):
     code: str = Field(pattern=r"^\d{4}$")
+
+
+# Seeding runs on the server, one job per Test day: a click adds exactly the asked-for number of Tickets,
+# whatever the browser does meanwhile (refresh, close, slow network). A second job waits for the first.
+SEED_BATCH = 500
+_seed_jobs: dict[str, dict] = {}
+_seed_lock = threading.Lock()
+
+
+def _seed_job_json(label: str) -> dict | None:
+    job = _seed_jobs.get(label)
+    return dict(job) if job else None
+
+
+def _run_seed_job(state, label: str) -> None:
+    job = _seed_jobs[label]
+    try:
+        while job["done"] < job["target"]:
+            step = min(SEED_BATCH, job["target"] - job["done"])
+            with state.sessionmaker() as db:
+                seed_tickets(db, label, step, state.clock.now(), state.settings.payment_secret)
+            job["done"] += step
+    except Exception as e:  # noqa: BLE001 - shown to the Admin; the Tickets added so far stay
+        job["error"] = getattr(e, "detail", None) or "Seeding stopped"
+    finally:
+        job["running"] = False
 
 
 def _iso(t):
@@ -59,6 +86,7 @@ def day_json(db: Session, day: m.DrawDay, now) -> dict:
         "drawnAt": _iso(day.drawn_at),
         "randomness": day.result.randomness if day.result else None,
         "winners": day.result.winners if day.result else None,
+        "seeding": _seed_job_json(day.label),
     }
 
 
@@ -163,6 +191,25 @@ def seed_test_day(label: Label, body: Seed, request: Request, db: Db) -> dict:
     except TestModeRefused as e:
         raise _refused(e) from e
     return {"label": label, "ticketCount": total}
+
+
+@router.post("/test-days/{label}/seed-job", status_code=202)
+def start_seed_job(label: Label, body: Seed, request: Request, db: Db) -> dict:
+    """Start adding `count` Tickets in the background; progress shows in the day's "seeding" field."""
+    require_admin(request, db)
+    try:
+        day = test_day(db, label)
+    except TestModeRefused as e:
+        raise _refused(e) from e
+    if day.status != "open":
+        raise HTTPException(status_code=409, detail="This Test day is closed")
+    with _seed_lock:
+        job = _seed_jobs.get(label)
+        if job and job["running"]:
+            raise HTTPException(status_code=409, detail="Tickets are already being added to this Test day")
+        _seed_jobs[label] = {"target": body.count, "done": 0, "running": True, "error": None}
+    threading.Thread(target=_run_seed_job, args=(request.app.state, label), daemon=True).start()
+    return _seed_job_json(label)
 
 
 @router.post("/test-days/{label}/close")

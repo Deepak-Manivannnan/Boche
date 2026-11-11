@@ -206,3 +206,25 @@ def test_deleting_test_days_removes_them_and_their_tickets_but_keeps_real_ones(t
         assert conn.scalar(sa.select(m.DrawDay.status).where(m.DrawDay.label == "2026-11-10")) == "open"
     assert ticket_count(db_engine, "2026-11-10") == 3
     assert ticket_count(db_engine, label) == 0
+
+
+def test_a_seed_job_adds_exactly_the_count_once_and_refuses_a_second_while_running(t, db_engine):
+    import time
+
+    label = new_day(t)
+    res = t.admin.post(f"/api/admin/test-days/{label}/seed-job", json={"count": 700})
+    assert res.status_code == 202, res.text
+    second = t.admin.post(f"/api/admin/test-days/{label}/seed-job", json={"count": 700})
+    for _ in range(300):
+        day = [d for d in t.admin.get("/api/admin/draw-days").json() if d["label"] == label][0]
+        if not day["seeding"]["running"]:
+            break
+        time.sleep(0.1)
+    assert day["seeding"] == {"target": 700, "done": 700, "running": False, "error": None}
+    assert second.status_code in (202, 409)
+    expected = 1400 if second.status_code == 202 else 700
+    for _ in range(300):
+        if ticket_count(db_engine, label) == expected:
+            break
+        time.sleep(0.1)
+    assert ticket_count(db_engine, label) == expected
