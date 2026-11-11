@@ -1499,7 +1499,7 @@
 
   /* ----- Verify the draw (public): every closed Draw day's files, its Seal on GitHub, its drand round, and the Verifier ----- */
   var DRAND_CHAIN = '52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971';
-  function verifyLink(label) { return '<a class="btn btn-line btn-sm mt12" href="#/verify-draw/' + encodeURIComponent(label) + '">' + ic('shield', 15) + 'Verify this draw</a>'; }
+  function verifyLink(label, inRow) { return '<a class="btn btn-line btn-sm' + (inRow ? '' : ' mt12') + '" href="#/verify-draw/' + encodeURIComponent(label) + '">' + ic('shield', 15) + 'Verify this draw</a>'; }
   SCREENS['verify-draw'] = function (focus) {
     var days = PUBLIC_DAYS, api = '/api/public/days/';
     function dl(href, text) { return '<a class="link" href="' + esc(href) + '" target="_blank" rel="noopener">' + esc(text) + '</a>'; }
@@ -1805,7 +1805,7 @@
     else if (d.status === 'sealed' && !d.canRequestOtp) body = '<div class="rule-note mt16">' + ic('clock', 16) + '<span>Waiting for drand round ' + d.drandRound + ', released at ' + istTime(d.roundReleasedAt, true) + '. The founder’s OTP can be sent after that.</span></div>';
     else if (d.status === 'sealed' && !d.otpExpiresAt) body = '<button class="btn btn-gold mt16" data-act="admSendOtp">' + ic('phone', 18) + 'Send OTP to founder</button>' +
       '<p class="fine center">The founder gets a 6-digit code by SMS. It runs this draw only, on the sealed list and the drand round above.</p>';
-    else if (d.status === 'sealed') body = '<div class="field-l">Founder’s OTP</div><div class="otp" id="otp">' + otpBoxes(6) + '</div><div class="err-text" id="otpErr"></div>' +
+    else if (d.status === 'sealed') body = '<div class="field-l">Founder’s OTP</div><div class="otp otp6" id="otp">' + otpBoxes(6) + '</div><div class="err-text" id="otpErr"></div>' +
       '<button class="btn btn-gold mt16" data-otp-btn data-act="admRun" disabled>' + ic('sparkle', 16) + 'Run the draw</button>' +
       (d.kind === 'test' && A.testCodes && A.testCodes[d.label] ? '<div class="demo-hint">TEST day code: <b>' + esc(A.testCodes[d.label]) + '</b></div>' : '') +
       '<p class="fine center mt12">Code sent · valid until ' + istTime(d.otpExpiresAt) + ' · <a class="link" href="javascript:void(0)" data-act="admSendOtp">Send a new code</a></p>';
@@ -1821,7 +1821,7 @@
       '<div class="kv"><span>Fingerprint</span><span class="adm-fp">' + (d.fingerprint ? esc(d.fingerprint.slice(0, 16)) + '…' : '—') + '</span></div>' +
       '<div class="kv"><span>Seal</span><span>' + (d.sealUrl ? '<a class="link" href="' + esc(d.sealUrl) + '" target="_blank" rel="noopener">On GitHub</a>' : d.fingerprint ? 'Publishing to GitHub…' : '—') + '</span></div>' +
       '<div class="kv"><span>Randomness</span><span>' + (d.drandRound ? 'drand round ' + d.drandRound + ' · ' + istTime(d.roundReleasedAt, true) : '—') + '</span></div></div>' +
-      body + (d.status === 'published' ? '<div class="btn-row mt12"><button class="btn btn-line btn-sm" data-act="admReveal">' + ic('sparkle', 15) + 'Preview the reveal</button>' + verifyLink(d.label) + '</div>' : '') +
+      body + (d.status === 'published' ? '<div class="btn-row mt12"><button class="btn btn-line btn-sm" data-act="admReveal">' + ic('sparkle', 15) + 'Preview the reveal</button>' + verifyLink(d.label, true) + '</div>' : '') +
       '<p class="fine center mt16">There is no way to redraw or change winners. Running again returns the saved result.</p>' + testPanel + '</div>';
   };
   AFTER['admin-draw'] = function () {
