@@ -8,7 +8,11 @@ Two ways in:
   the profile.
 
 A number belongs to one account: a Google sign-up with a number already registered is refused straight away.
-Accounts made before this (Google only, no number) keep signing in with Google as they always did."""
+Accounts made before this (Google only, no number) keep signing in with Google as they always did.
+
+Admins sign in on the admin page (Google email on ADMIN_EMAILS, or a number on ADMIN_MOBILES) to an admin
+identity of their own. On the customer page the same Google account or number is an ordinary customer: it
+signs up and in like anyone else and its customer account never has admin rights."""
 
 import logging
 from typing import Annotated
@@ -22,7 +26,6 @@ from sqlalchemy.orm import Session
 from app.auth.google import AuthError, AuthUnavailable
 from app.auth.mobile import check_code, mobile_taken, normalise_mobile, send_code
 from app.core.deps import current_user, get_db, role_for, user_json
-from app.core.deps import is_admin as is_admin_user
 from app.db import models as m
 from app.draw.otp import OtpRefused
 from app.shop.routes import Delivery
@@ -104,30 +107,35 @@ def public_config(request: Request) -> dict:
 def sign_in_with_google(body: GoogleSignIn, request: Request, response: Response, db: Db) -> dict:
     who = _google(request, body.credential)
     settings = request.app.state.settings
+    if body.admin:
+        # Admin page: only a Google email on ADMIN_EMAILS, and it signs in to its admin identity, which is
+        # apart from any customer account the same Google account has. Nobody else gets an account here.
+        if who.email not in settings.admin_emails:
+            raise HTTPException(status_code=403, detail="This Google account is not a Lucky Draw admin")
+        admin = db.scalar(sa.select(m.User).where(m.User.admin_email == who.email))
+        if admin is None:
+            admin = m.User(name=who.name, admin_email=who.email, created_at=request.app.state.clock.now())
+            db.add(admin)
+        admin.picture, admin.role = _photo(who.picture), "admin"
+        db.commit()
+        return _signed_in(request, response, admin)
+
+    # Customer page: every Google account, an Admin's included, is a customer here.
     # Match on Google's stable account id; an existing row with the same verified email is the same person.
     user = db.scalar(sa.select(m.User).where(m.User.google_sub == who.sub))
     if user is None:
         user = db.scalar(sa.select(m.User).where(m.User.email == who.email))
-    # An Admin by email, or an account whose verified mobile number is on the Admin list
-    is_admin = who.email in settings.admin_emails or (user is not None and is_admin_user(user, settings))
-    if body.admin and not is_admin:
-        # Staff page: no customer account or session is created for someone who is not an Admin.
-        raise HTTPException(status_code=403, detail="This Google account is not a Lucky Draw admin")
-    if user is None and not is_admin:
+    if user is None:
         # A new customer: verify a mobile number and create the profile first; no account exists yet.
         pending = {
             "g": {"sub": who.sub, "email": who.email, "name": who.name, "picture": _photo(who.picture)}
         }
         request.app.state.pending_signups.issue(response, pending)
         return _signup_state(pending)
-    if user is None:
-        user = m.User(google_sub=who.sub, email=who.email, name=who.name)
-        db.add(user)
     # The name is the customer's own (editable in the profile), so Google no longer overwrites it.
     user.google_sub, user.email = who.sub, who.email
     user.picture = _photo(who.picture)  # refreshed so a changed Google photo shows
-    # The Admin lists are server configuration, re-read at every sign-in (and every admin request).
-    user.role = role_for(user, settings)
+    user.role = role_for(user, settings)  # a customer account: never an Admin through its email
     db.commit()
     return _signed_in(request, response, user)
 

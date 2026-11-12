@@ -35,8 +35,10 @@ def complete_signup(client, mobile: str, name: str, age: int = 30, address=None)
 
 
 def google_sign_up(client, name: str, mobile: str | None = None):
-    """Sign in as the fake Google account <name>; a new customer verifies a number and creates a profile."""
-    res = client.post("/api/auth/google", json={"credential": f"{name}-token-xxxxxxxxxx"})
+    """Sign in as the fake Google account <name>; a new customer verifies a number and creates a profile.
+    "admin" (admin@example.com, on ADMIN_EMAILS) signs in on the admin page, to its admin identity."""
+    credential = {"credential": f"{name}-token-xxxxxxxxxx", **({"admin": True} if name == "admin" else {})}
+    res = client.post("/api/auth/google", json=credential)
     assert res.status_code == 200, res.text
     if "signup" in res.json():
         res = complete_signup(client, mobile or mobile_for(name), res.json()["signup"]["name"])

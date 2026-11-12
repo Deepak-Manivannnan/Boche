@@ -1983,7 +1983,7 @@
   }
   SCREENS['admin-draw'] = function () {
     var A = ui.adm, d = admDay();
-    var head = '<div class="staff-head"><span class="ca-ic">' + ic('crown', 22) + '</span><div class="li-main"><div class="ca-t">Lucky Draw admin</div><div class="ca-s">' + esc(ME ? ME.name + ' · ' + (ME.email || '+91 ' + fmtMobile(ME.adminMobile || ME.mobile || '')) : '') + '</div></div>' +
+    var head = '<div class="staff-head"><span class="ca-ic">' + ic('crown', 22) + '</span><div class="li-main"><div class="ca-t">Lucky Draw admin</div><div class="ca-s">' + esc(ME ? ME.name + ' · ' + (ME.adminEmail || ME.email || '+91 ' + fmtMobile(ME.adminMobile || ME.mobile || '')) : '') + '</div></div>' +
       '<button class="iconbtn" data-act="logout" aria-label="Sign out">' + ic('logout') + '</button></div>';
     if (!A || !A.days) return head + '<div class="pad center mt24"><span class="mini-spin" aria-label="Loading"></span></div>';
     var testPanel = '<div class="field-l">Test mode</div><div class="surface" style="padding:12px 16px"><p class="fine" style="margin-top:0">Run a whole day now: seed tickets, close entries, send the OTP and draw. Test days are labelled TEST and never touch real draws.</p>' +

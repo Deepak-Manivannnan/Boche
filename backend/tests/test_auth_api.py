@@ -182,7 +182,17 @@ def test_signing_out_ends_the_session(api):
 
 
 def test_an_email_on_the_admin_list_signs_in_as_admin(api):
-    assert sign_in(api, "admin-token").json()["role"] == "admin"
+    res = api.post("/api/auth/google", json={"credential": "admin-token" + "x" * 10, "admin": True})
+    assert res.json()["role"] == "admin"  # on the admin page
+
+
+def test_the_same_admin_email_on_the_customer_page_makes_a_customer_account(api):
+    admin = api.post("/api/auth/google", json={"credential": "admin-token" + "x" * 10, "admin": True}).json()
+    api.post("/api/auth/logout")
+    customer = sign_in(api, "admin-token").json()  # Continue with Google on the welcome page
+    assert customer["id"] != admin["id"] and customer["role"] == "customer"
+    assert customer["email"] == "deepak@example.com" and customer["mobile"] is not None  # a full sign-up
+    assert api.get("/api/admin/draw-days").status_code == 403
 
 
 def test_the_frontend_can_read_the_google_client_id(api):

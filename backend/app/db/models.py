@@ -70,8 +70,10 @@ class User(Base):
         sa.String(20), unique=True
     )  # 10 digits, one account per number
     mobile_verified_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
-    # An Admin who signs in on the admin page with a number on ADMIN_MOBILES. Kept apart from `mobile`, so the
-    # same number can still make its own customer account.
+    # An Admin identity, made by signing in on the admin page with a Google email on ADMIN_EMAILS or a number
+    # on ADMIN_MOBILES. Kept apart from `email` and `mobile`, so the same Google account or number can still
+    # make its own customer account (which never has admin rights).
+    admin_email: Mapped[str | None] = mapped_column(sa.String(320), unique=True)
     admin_mobile: Mapped[str | None] = mapped_column(sa.String(20), unique=True)
     age: Mapped[int | None] = mapped_column(sa.Integer)
     picture: Mapped[str | None] = mapped_column(

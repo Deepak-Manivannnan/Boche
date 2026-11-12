@@ -254,7 +254,8 @@ def test_an_account_made_before_mobile_sign_in_still_signs_in_with_google(make_c
 
 
 def test_an_admin_signs_in_with_google_without_a_mobile_step(make_client):
-    me = make_client(None).post("/api/auth/google", json={"credential": "admin-token-xxxxxxxxxx"}).json()
+    body = {"credential": "admin-token-xxxxxxxxxx", "admin": True}  # on the admin page
+    me = make_client(None).post("/api/auth/google", json=body).json()
     assert me["role"] == "admin" and "signup" not in me
 
 
