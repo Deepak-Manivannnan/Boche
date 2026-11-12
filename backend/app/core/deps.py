@@ -22,14 +22,11 @@ def current_user(request: Request, db: Session) -> m.User:
 
 
 def is_admin(user: m.User, settings) -> bool:
-    """On the server's Admin lists right now: the Google email in ADMIN_EMAILS, or the verified mobile
-    number in ADMIN_MOBILES. Re-read on every request, so taking someone off a list ends their access."""
+    """On the server's Admin lists right now: the Google email in ADMIN_EMAILS, or the admin identity's
+    number (made by signing in on the admin page) in ADMIN_MOBILES. A customer account never becomes an
+    Admin through its own mobile number. Re-read on every request, so removal from a list ends access."""
     by_email = user.email is not None and user.email in settings.admin_emails
-    by_mobile = (
-        user.mobile is not None
-        and user.mobile_verified_at is not None
-        and user.mobile in settings.admin_mobiles
-    )
+    by_mobile = user.admin_mobile is not None and user.admin_mobile in settings.admin_mobiles
     return by_email or by_mobile
 
 
@@ -52,6 +49,7 @@ def user_json(user: m.User) -> dict:
         "firstName": user.name.split(" ")[0],
         "email": user.email,
         "mobile": user.mobile,
+        "adminMobile": user.admin_mobile,  # set only on an Admin's own mobile sign-in identity
         "age": user.age,
         "hasGoogle": bool(user.google_sub),  # false: signs in with the mobile number only
         "picture": user.picture,

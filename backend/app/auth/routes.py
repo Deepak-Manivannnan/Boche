@@ -215,11 +215,12 @@ def verify_admin_code(body: CodeIn, request: Request, response: Response, db: Db
     except OtpRefused as e:
         raise _refused(e) from e
     now = state.clock.now()
-    user = db.scalar(sa.select(m.User).where(m.User.mobile == mobile))
-    if user is None:  # the Admin's first sign-in with this number: an account for it (name editable)
-        user = m.User(name="Admin", mobile=mobile, mobile_verified_at=now, created_at=now)
+    # The admin identity for this number, kept apart from customer accounts: the same number can still make
+    # (or already have) its own customer account, which this never touches.
+    user = db.scalar(sa.select(m.User).where(m.User.admin_mobile == mobile))
+    if user is None:
+        user = m.User(name="Admin", admin_mobile=mobile, created_at=now)
         db.add(user)
-    user.mobile_verified_at = user.mobile_verified_at or now
     user.role = "admin"
     db.commit()
     log.warning("admin signed in with mobile number ending %s (user %s)", mobile[-4:], user.id)
@@ -266,7 +267,7 @@ def create_profile(body: NewProfile, request: Request, response: Response, db: D
         role="customer",
         created_at=now,
     )
-    user.role = role_for(user, state.settings)  # an Admin's own number made through sign-up is an Admin too
+    user.role = role_for(user, state.settings)
     db.add(user)
     try:
         db.flush()

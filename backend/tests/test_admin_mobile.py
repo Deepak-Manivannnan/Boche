@@ -35,8 +35,34 @@ def test_a_listed_number_signs_in_as_admin(make_client):
     admin_list(browser, ADMIN)
     assert send(browser, "+91 98470 00001").json() == {"sent": True, "mobile": ADMIN}
     me = verify(browser, ADMIN).json()
-    assert (me["role"], me["mobile"], me["name"]) == ("admin", ADMIN, "Admin")
+    assert (me["role"], me["adminMobile"], me["name"]) == ("admin", ADMIN, "Admin")
+    assert me["mobile"] is None  # an admin identity, not a customer account holding the number
     assert browser.get("/api/admin/draw-days").status_code == 200
+
+
+def test_the_same_number_can_also_make_its_own_customer_account(make_client):
+    admin = make_client(None)
+    admin_list(admin, ADMIN)
+    send(admin, ADMIN)
+    admin_id = verify(admin, ADMIN).json()["id"]
+
+    customer = make_client(None)  # the same person on the customer side, same number
+    customer.post("/api/auth/otp/send", json={"mobile": ADMIN})
+    step = customer.post(
+        "/api/auth/otp/verify", json={"mobile": ADMIN, "code": sms(customer).code_for(ADMIN)}
+    )
+    assert step.json()["signup"]["step"] == "profile"  # a new customer account, not the admin identity
+    me = customer.post("/api/auth/signup", json={"name": "Deepak M", "age": 30}).json()
+    assert (me["mobile"], me["role"]) == (ADMIN, "customer") and me["id"] != admin_id
+    assert customer.get("/api/admin/draw-days").status_code == 403  # the customer account is not an Admin
+    assert admin.get("/api/admin/draw-days").status_code == 200  # the admin sign-in still is
+
+    customer.post("/api/auth/logout")  # and next time the customer side signs in to the customer account
+    customer.post("/api/auth/otp/send", json={"mobile": ADMIN})
+    again = customer.post(
+        "/api/auth/otp/verify", json={"mobile": ADMIN, "code": sms(customer).code_for(ADMIN)}
+    )
+    assert again.json()["id"] == me["id"]
 
 
 def test_any_other_number_gets_no_code_and_no_sms(make_client, db_engine):
@@ -98,15 +124,42 @@ def test_trying_many_numbers_from_one_connection_is_stopped(make_client):
     assert sms(browser).sent == []
 
 
-def test_a_customer_account_with_an_admin_number_becomes_that_admin(make_client):
+def test_an_existing_customer_account_with_that_number_is_left_alone(make_client):
     customer = make_client("meera")  # a customer account, with its own verified number
-    mobile = customer.get("/api/me").json()["mobile"]
-    assert customer.get("/api/admin/draw-days").status_code == 403
+    mine = customer.get("/api/me").json()
     browser = make_client(None)
-    admin_list(browser, mobile)
-    send(browser, mobile)
-    me = verify(browser, mobile).json()
-    assert (me["name"], me["role"]) == ("Meera Tester", "admin")  # the same account, now an Admin
+    admin_list(browser, mine["mobile"])
+    send(browser, mine["mobile"])
+    admin = verify(browser, mine["mobile"]).json()
+    assert admin["id"] != mine["id"] and admin["role"] == "admin"  # its own admin identity
+    assert customer.get("/api/me").json() == mine  # the customer account is unchanged
+    assert customer.get("/api/admin/draw-days").status_code == 403  # and gets no admin rights from its number
+
+
+def test_admin_accounts_made_before_this_free_their_number(migrated_url, clean_db):
+    """The live database has an "Admin" account made by the old admin mobile sign-in, holding the number as a
+    customer number. The migration moves it to the admin identity; real customer accounts are untouched."""
+    from alembic import command
+
+    from app.core.migrate import _config
+
+    cfg, engine = _config(migrated_url), sa.create_engine(migrated_url)
+    command.downgrade(cfg, "0005")
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                sa.text(
+                    "INSERT INTO users (name, mobile, mobile_verified_at, age, role, created_at) VALUES "
+                    "('Admin', '9847000001', NOW(6), NULL, 'admin', NOW(6)), "
+                    "('Meera K', '9847000002', NOW(6), 29, 'customer', NOW(6))"
+                )
+            )
+    finally:
+        command.upgrade(cfg, "head")
+    with engine.connect() as conn:
+        rows = conn.execute(sa.text("SELECT name, mobile, admin_mobile FROM users ORDER BY id")).all()
+    engine.dispose()
+    assert [tuple(r) for r in rows] == [("Admin", None, "9847000001"), ("Meera K", "9847000002", None)]
 
 
 def test_a_customer_code_for_an_unlisted_number_never_opens_the_admin_page(make_client):
