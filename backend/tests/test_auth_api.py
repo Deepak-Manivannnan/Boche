@@ -89,6 +89,45 @@ def test_signing_in_again_updates_the_same_customer(api, google):
     assert again["name"] == "Arun M. Mathew"
 
 
+ARUN_PHOTO = "https://lh3.googleusercontent.com/a/arun-photo=s96-c"
+MEERA_PHOTO = "https://lh3.googleusercontent.com/a/meera-photo=s96-c"
+
+
+def test_each_account_gets_its_own_google_profile_photo(api, google):
+    google.tokens["arun-token" + "x" * 10] = GoogleIdentity(
+        "g-arun", "arun@example.com", "Arun Mathew", ARUN_PHOTO
+    )
+    google.tokens["meera-token" + "x" * 10] = GoogleIdentity(
+        "g-meera", "meera@example.com", "Meera K", MEERA_PHOTO
+    )
+    assert sign_in(api).json()["picture"] == ARUN_PHOTO
+    assert api.get("/api/me").json()["picture"] == ARUN_PHOTO
+    api.post("/api/auth/logout")
+    assert (
+        sign_in(api, "meera-token").json()["picture"] == MEERA_PHOTO
+    )  # same browser, the other account's photo
+    assert api.get("/api/me").json()["picture"] == MEERA_PHOTO
+
+
+def test_the_photo_follows_the_google_account_at_each_sign_in(api, google):
+    google.tokens["arun-token" + "x" * 10] = GoogleIdentity(
+        "g-arun", "arun@example.com", "Arun Mathew", ARUN_PHOTO
+    )
+    sign_in(api)
+    new = "https://lh3.googleusercontent.com/a/arun-new-photo=s96-c"
+    google.tokens["arun-token" + "x" * 10] = GoogleIdentity("g-arun", "arun@example.com", "Arun Mathew", new)
+    assert sign_in(api).json()["picture"] == new
+    google.tokens["arun-token" + "x" * 10] = GoogleIdentity("g-arun", "arun@example.com", "Arun Mathew", None)
+    assert sign_in(api).json()["picture"] is None  # photo removed on Google: initials again
+
+
+def test_only_an_https_photo_link_is_kept(api, google):
+    google.tokens["arun-token" + "x" * 10] = GoogleIdentity(
+        "g-arun", "arun@example.com", "Arun Mathew", "javascript:alert(1)"
+    )
+    assert sign_in(api).json()["picture"] is None
+
+
 def test_an_invalid_google_token_is_refused_and_no_session_is_created(api):
     res = api.post("/api/auth/google", json={"credential": "forged-token-xxxxxxxxxx"})
     assert res.status_code == 401

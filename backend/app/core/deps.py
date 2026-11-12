@@ -36,5 +36,6 @@ def user_json(user: m.User) -> dict:
         "firstName": user.name.split(" ")[0],
         "email": user.email,
         "mobile": user.mobile,
+        "picture": user.picture,
         "role": user.role,
     }

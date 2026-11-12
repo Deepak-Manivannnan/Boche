@@ -32,6 +32,8 @@
   Object.keys(S.members).forEach(function (k) {
     var m = S.members[k];
     if (m.address || m.addresses || m.defaultAddr) { delete m.address; delete m.addresses; delete m.defaultAddr; save(); }
+    /* Same for a photo uploaded here: each account now shows its own Google profile photo */
+    if (m.profile && m.profile.photo) { delete m.profile.photo; save(); }
   });
   /* Older orders carried one card with one number; now an order carries one card per pack */
   Object.keys(S.members).forEach(function (k) {
@@ -103,11 +105,14 @@
   function eligible(o, id) { var st = ageState(o, id); return st === 'open' || st === 'ok'; }
   function verifyRoute(back) { return 'kyc/' + encodeURIComponent(back); }
   /* Member photo: their own upload, else the supplied member picture (the Boche portrait is brand art, never a member photo) */
-  function memberPhoto() { var p = (S.members[BC_MEMBER.id] || {}).profile || {}; return p.photo || '/img/member.webp'; }
-  function avatarHtml() { var ph = memberPhoto(); return ph ? '<div class="avatar has-photo"><img src="' + esc(ph) + '" alt=""></div>' : '<div class="avatar">' + initials(BC_MEMBER.name) + '</div>'; }
+  /* The signed-in account's own Google profile photo (from /api/me); no photo → their initials. Google's image
+     host can refuse requests that carry a referrer, hence no-referrer; if it still fails, the initials show. */
+  function memberPhoto() { return ME ? ME.picture || null : '/img/member.webp'; }
+  function photoImg(ph, cls) { return '<img' + (cls ? ' class="' + cls + '"' : '') + ' src="' + esc(ph) + '" alt="" referrerpolicy="no-referrer" decoding="async" onerror="this.classList.add(\'gone\')">'; }
+  function avatarHtml() { var ph = memberPhoto(); return ph ? '<div class="avatar has-photo"><span>' + initials(BC_MEMBER.name) + '</span>' + photoImg(ph) + '</div>' : '<div class="avatar">' + initials(BC_MEMBER.name) + '</div>'; }
   function photoTag(cls, brandImg) {
     var ph = brandImg || memberPhoto();
-    return ph ? '<img class="' + cls + '" src="' + esc(ph) + '" alt="" decoding="async">' : '<span class="' + cls + ' ph">' + initials(BC_MEMBER.name) + '</span>';
+    return ph ? photoImg(ph, cls) : '<span class="' + cls + ' ph">' + initials(BC_MEMBER.name) + '</span>';
   }
   function initials(name) { return name.split(' ').map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase(); }
   function greeting() { var h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; }
@@ -188,7 +193,7 @@
     support: [['grievance', 'clip', 'Raise a complaint'], ['card', 'card', 'My card'], ACT], grievance: [HELP, ACT], ticket: [HELP, ACT],
     activity: [TIERS, DRAW, HELP], tiers: [OFFERS, ACT, HELP], offers: [TIERS, DRAW, VENUES], profile: [HELP, TIERS, ADDRS, DRAW]
   };
-  function avatarMini() { var ph = memberPhoto(); return ph ? '<img src="' + esc(ph) + '" alt="">' : '<span>' + initials(BC_MEMBER.name) + '</span>'; }
+  function avatarMini() { var ph = memberPhoto(); return '<span>' + initials(BC_MEMBER.name) + '</span>' + (ph ? photoImg(ph) : ''); }
   function menuItem(m) { return '<button role="menuitem" data-go="' + m[0] + '">' + ic(m[1], 16) + m[2] + '</button>'; }
   function topbarMenu(name) {
     var items = (PAGE_MENU[name] || []).filter(function (m) { return m[0] !== name; }), open = ui.pageMenu, bd = '<div class="kmenu-bd" data-act="pageMenu" data-id=""></div>';
@@ -668,23 +673,6 @@
     });
   }
   AFTER.home = function () { smsCheck(); wireRail(); };
-
-  AFTER.profile = function () {
-    var f = $('photoIn'); if (!f) return;
-    f.addEventListener('change', function () {
-      var file = f.files && f.files[0]; if (!file) return;
-      var img = new Image(), url = URL.createObjectURL(file);
-      img.onload = function () {
-        var n = 320, c = document.createElement('canvas'), side = Math.min(img.width, img.height);
-        c.width = c.height = n;
-        c.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 3, side, side, 0, 0, n, n);
-        URL.revokeObjectURL(url);
-        var d = dyn(BC_MEMBER.id); d.profile = d.profile || {}; d.profile.photo = c.toDataURL('image/jpeg', .85); save(); rerender(); toast('Photo updated');
-      };
-      img.onerror = function () { URL.revokeObjectURL(url); toast('Could not read that image'); };
-      img.src = url;
-    });
-  };
 
   /* ----- Card ----- */
   SCREENS.card = function () {
@@ -1813,7 +1801,7 @@
       return '<button class="li" ' + act + '><span class="li-ic">' + ic(icn, 18) + '</span><div class="li-main"><div class="li-t">' + title + '</div>' + (sub ? '<div class="li-s">' + sub + '</div>' : '') + '</div>' + (extra == null ? '<span class="li-chev">' + ic('chev', 18) + '</span>' : extra) + '</button>';
     }
     return topbar('Profile', '') +
-      '<div class="prof-head"><button class="avatar-btn" data-act="photoPick" aria-label="Change photo">' + avatarHtml() + '<span class="av-cam">' + ic('plus', 12) + '</span></button><input type="file" id="photoIn" accept="image/*" hidden><div><div class="prof-name">' + esc(BC_MEMBER.name) + '</div>' +
+      '<div class="prof-head"><span class="avatar-btn" title="Your Google profile photo">' + avatarHtml() + '</span><div><div class="prof-name">' + esc(BC_MEMBER.name) + '</div>' +
       '<div class="li-s">' + esc(BC_MEMBER.id) + '</div><span class="badge mt8">' + ic('crown', 12) + esc(t.name) + ' member</span></div></div>' +
       '<div class="pad"><div class="list">' + row('receipt', 'Activity', 'Points, bills and visits', 'data-go="activity"') + '</div><div class="field-l">Account</div><div class="list">' +
       row('phone', '+91 ' + esc(BC_MEMBER.mobile), 'Mobile · SIM verified on this phone', 'disabled', '<span class="badge ok">Verified</span>') +
@@ -2404,7 +2392,6 @@
     notifs: function () { toast('You’re all caught up'); },
     flip: function () { $('flip').classList.toggle('flipped'); },
     drawDay: function (el) { ui.drawSel = ui.drawSel === el.dataset.id ? null : el.dataset.id; rerender(); },
-    photoPick: function () { var f = $('photoIn'); if (f) f.click(); },
     exploreFilter: function (el) { ui.exploreFilter = el.dataset.id; rerender(); },
     actTab: function (el) { ui.actTab = el.dataset.id; rerender(); },
     actBiz: function (el) { ui.actBiz = el.dataset.id; rerender(); },

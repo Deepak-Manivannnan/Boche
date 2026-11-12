@@ -66,6 +66,9 @@ class User(Base):
     email: Mapped[str] = mapped_column(sa.String(320), unique=True)
     name: Mapped[str] = mapped_column(sa.String(200))
     mobile: Mapped[str | None] = mapped_column(sa.String(20))
+    picture: Mapped[str | None] = mapped_column(
+        sa.String(1000)
+    )  # Google profile photo URL, set at each sign-in
     role: Mapped[str] = mapped_column(enum("customer", "admin", name="user_role"), default="customer")
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 

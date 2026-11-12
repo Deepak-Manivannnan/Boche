@@ -46,6 +46,12 @@ def sign_in_with_google(body: GoogleSignIn, request: Request, response: Response
         user = m.User(google_sub=who.sub, email=who.email, name=who.name)
         db.add(user)
     user.google_sub, user.email, user.name = who.sub, who.email, who.name
+    # The Google profile photo, refreshed at every sign-in so a changed photo shows; https links only.
+    user.picture = (
+        who.picture
+        if who.picture and who.picture.startswith("https://") and len(who.picture) <= 1000
+        else None
+    )
     # The Admin list is server configuration, re-read at every sign-in so removal takes effect.
     user.role = "admin" if who.email in request.app.state.settings.admin_emails else "customer"
     db.commit()
