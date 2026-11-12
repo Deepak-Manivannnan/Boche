@@ -27,9 +27,11 @@
   function saveSes() { try { sessionStorage.setItem(SS_KEY, JSON.stringify(SES)); } catch (e) {} }
   var S = readJSON(localStorage, LS_KEY) || freshShared();
   if (S.notif.sound === undefined) S.notif.sound = true;
+  /* Delivery addresses now live on the server, per account (/api/me/addresses). Drop the copy this browser
+     used to keep: it was shared by every account signed in here, so it may belong to someone else. */
   Object.keys(S.members).forEach(function (k) {
     var m = S.members[k];
-    if (m.address && !m.addresses) { m.addresses = [{ id: 'A1', label: 'Home', addr: m.address.addr, area: m.address.area }]; m.defaultAddr = 'A1'; delete m.address; }
+    if (m.address || m.addresses || m.defaultAddr) { delete m.address; delete m.addresses; delete m.defaultAddr; save(); }
   });
   /* Older orders carried one card with one number; now an order carries one card per pack */
   Object.keys(S.members).forEach(function (k) {
@@ -54,7 +56,9 @@
     var p = S.members[BC_MEMBER.id].profile;
     BC_MEMBER.name = p ? p.name : BASE.name; BC_MEMBER.firstName = p ? p.name.split(' ')[0] : BASE.firstName;
     BC_MEMBER.email = p ? p.email : BASE.email; BC_MEMBER.mobile = p && p.mobile ? p.mobile : BASE.mobile;
-    if (ME) { BC_MEMBER.name = ME.name; BC_MEMBER.firstName = ME.firstName; BC_MEMBER.email = ME.email; if (ME.mobile) BC_MEMBER.mobile = ME.mobile; }
+    /* Signed in: name and email come from the Google account; the mobile stays the prototype's fixed number,
+       never one another account typed on this browser */
+    if (ME) { BC_MEMBER.name = ME.name; BC_MEMBER.firstName = ME.firstName; BC_MEMBER.email = ME.email; BC_MEMBER.mobile = ME.mobile || BASE.mobile; }
   }
   applyProfile();
   function teaBlankBag() { var q = {}; BC_TEA.packs.forEach(function (p) { q[p.id] = 0; }); return q; }
@@ -323,6 +327,7 @@
     ui.signInErr = '';
     BCAPI.post('/auth/google', { credential: resp.credential }).then(function (u) {
       ME = u; applyProfile(); SES.authed = true; SES.pending = null; saveSes(); refreshOrders(true);
+      ADDRS = null; ADDRS_FOR = null; loadAddrs();   /* this account's saved addresses, and no one else's */
       go('home'); toast('Welcome, ' + BC_MEMBER.firstName);
     }).catch(function (e) {
       ui.signInErr = e.status === 503 ? 'Google sign-in is unavailable right now. Please try again.' : 'Sign-in failed. Please try again.';
@@ -1120,18 +1125,30 @@
   };
   AFTER.address = function () { wireAddr(ui.addrEd, 'address', function () { ACTIONS.saveAddress(); }); };
 
-  /* ----- Saved delivery addresses (many, one default) ----- */
-  function addrList() { var d = dyn(BC_MEMBER.id); return d.addresses = d.addresses || []; }
-  function addrDefault() { var d = dyn(BC_MEMBER.id), l = addrList(); return l.filter(function (a) { return a.id === d.defaultAddr; })[0] || l[0]; }
+  /* ----- Saved delivery addresses (many, one default), stored per account on the server. The list is kept
+     in memory only for the account it was loaded for, so another account on this browser never sees it. ----- */
+  var ADDRS = null, ADDRS_FOR = null;
+  function fromServerAddr(a) {
+    return { id: a.id, label: a.label, isDefault: a.default, addr: { pin: a.pin, name: a.name, house: a.house, street: a.street }, area: { po: a.po, district: a.district } };
+  }
+  function loadAddrs() {
+    var who = ME && ME.id; if (!who) { ADDRS = null; ADDRS_FOR = null; return Promise.resolve(); }
+    return BCAPI.get('/me/addresses').then(function (l) {
+      if (!ME || ME.id !== who) return;   /* signed out or switched account meanwhile */
+      ADDRS = l.map(fromServerAddr); ADDRS_FOR = who;
+    }).catch(function (e) { if (e.status === 401) ACTIONS.logout(); });
+  }
+  function addrList() { return ADDRS && ME && ADDRS_FOR === ME.id ? ADDRS : []; }
+  function addrDefault() { var l = addrList(); return l.filter(function (a) { return a.isDefault; })[0] || l[0]; }
   function addrLine(sv) { return sv.addr.house + ', ' + sv.addr.street + ', ' + teaAreaLine({ po: sv.area.po, district: sv.area.district, pin: sv.addr.pin }); }
-  /* Adds or updates; the same house + street + pincode is treated as the same address */
+  function addrBody(sv) {
+    return { label: sv.label || 'Home', name: sv.addr.name.trim(), house: sv.addr.house.trim(), street: sv.addr.street.trim(), pin: sv.addr.pin, po: sv.area.po || '', district: sv.area.district };
+  }
+  /* Saves to the account: updates sv.id if it has one, otherwise adds it (the server treats the same house +
+     street + pincode as the same address). Resolves with the saved address. */
   function addrUpsert(sv) {
-    var l = addrList(), d = dyn(BC_MEMBER.id);
-    var same = l.filter(function (a) { return a.id === sv.id || (a.addr.pin === sv.addr.pin && a.addr.house.trim().toLowerCase() === sv.addr.house.trim().toLowerCase() && a.addr.street.trim().toLowerCase() === sv.addr.street.trim().toLowerCase()); })[0];
-    if (same) { sv.id = same.id; l[l.indexOf(same)] = sv; }
-    else { sv.id = 'A' + Date.now().toString(36); l.push(sv); }
-    if (!d.defaultAddr || !l.some(function (a) { return a.id === d.defaultAddr; })) d.defaultAddr = sv.id;
-    save(); return sv;
+    var req = sv.id ? BCAPI.put('/me/addresses/' + sv.id, addrBody(sv)) : BCAPI.post('/me/addresses', addrBody(sv));
+    return req.then(function (a) { return loadAddrs().then(function () { return fromServerAddr(a); }); });
   }
   var ADDR_LABELS = ['Home', 'Work', 'Other'];
 
@@ -2212,33 +2229,38 @@
     },
     addrPo: function (el) { (parse().name === 'address' ? ui.addrEd : ui.tea).area.po = el.dataset.id; rerender(); },
     editAddress: function (el) {
-      var id = el.dataset.id, sv = addrList().filter(function (a) { return a.id === id; })[0];
+      var id = +el.dataset.id, sv = addrList().filter(function (a) { return a.id === id; })[0];
       if (sv) { ui.addrEd = addrFromSaved(sv); ui.addrEd.id = sv.id; ui.addrEd.label = sv.label || 'Home'; }
       else { ui.addrEd = addrBlank(); ui.addrEd.label = addrList().some(function (a) { return a.label === 'Home'; }) ? 'Other' : 'Home'; }
       go('address');
     },
     addrLabel: function (el) { ui.addrEd.label = el.dataset.id; rerender(); },
     saveAddress: function () {
-      var A = ui.addrEd; if (!addrOk(A)) return;
-      var sv = addrToSaved(A); sv.id = A.id; sv.label = A.label;
-      addrUpsert(sv);
-      if (!teaCount()) { ui.tea.addr = { pin: '', name: '', house: '', street: '' }; ui.tea.area = null; ui.tea.pick = null; }
-      ui.addrEd = null; toast('Address saved');
-      if (navStack.length > 1) history.back(); else go('addresses');
+      var A = ui.addrEd; if (!addrOk(A) || A.busy) return;
+      var sv = addrToSaved(A); sv.id = A.id; sv.label = A.label; A.busy = true;
+      addrUpsert(sv).then(function () {
+        if (!teaCount()) { ui.tea.addr = { pin: '', name: '', house: '', street: '' }; ui.tea.area = null; ui.tea.pick = null; }
+        ui.addrEd = null; toast('Address saved');
+        if (navStack.length > 1) history.back(); else go('addresses');
+      }, function (e) { A.busy = false; toast(e.status === 422 ? 'Please check the address' : e.message || 'Could not save the address'); });
     },
-    defAddress: function (el) { dyn(BC_MEMBER.id).defaultAddr = el.dataset.id; save(); rerender(); toast('Default address updated'); },
+    defAddress: function (el) {
+      BCAPI.post('/me/addresses/' + el.dataset.id + '/default').then(function () { return loadAddrs(); })
+        .then(function () { rerender(); toast('Default address updated'); }, function () { toast('Could not update the default address'); });
+    },
     delAddress: function (el) {
-      openSheet('<h3>Delete this address?</h3><p class="lead">' + esc(addrLine(addrList().filter(function (a) { return a.id === el.dataset.id; })[0])) + '</p>' +
+      openSheet('<h3>Delete this address?</h3><p class="lead">' + esc(addrLine(addrList().filter(function (a) { return a.id === +el.dataset.id; })[0])) + '</p>' +
         '<div class="btn-row mt16"><button class="btn btn-line" data-act="closeSheet">Cancel</button><button class="btn btn-gold" data-act="confirmDelAddress" data-id="' + el.dataset.id + '">Delete</button></div>');
     },
     confirmDelAddress: function (el) {
-      var d = dyn(BC_MEMBER.id); d.addresses = addrList().filter(function (a) { return a.id !== el.dataset.id; });
-      if (d.defaultAddr === el.dataset.id) d.defaultAddr = d.addresses[0] ? d.addresses[0].id : null;
-      if (ui.tea.pick === el.dataset.id) { ui.tea.pick = null; ui.tea.addr = { pin: '', name: '', house: '', street: '' }; ui.tea.area = null; }
-      save(); closeSheet(); rerender(); toast('Address deleted');
+      var id = +el.dataset.id;
+      BCAPI.del('/me/addresses/' + id).then(function () { return loadAddrs(); }).then(function () {
+        if (ui.tea.pick === id) { ui.tea.pick = null; ui.tea.addr = { pin: '', name: '', house: '', street: '' }; ui.tea.area = null; }
+        closeSheet(); rerender(); toast('Address deleted');
+      }, function () { closeSheet(); toast('Could not delete the address'); });
     },
     teaPickAddr: function (el) {
-      var sv = addrList().filter(function (a) { return a.id === el.dataset.id; })[0]; if (!sv) return;
+      var sv = addrList().filter(function (a) { return a.id === +el.dataset.id; })[0]; if (!sv) return;
       var A = addrFromSaved(sv); ui.tea.addr = A.addr; ui.tea.area = A.area; ui.tea.look = 'idle'; ui.tea.pick = sv.id; rerender();
     },
     teaNewAddr: function () { var A = addrBlank(); ui.tea.addr = A.addr; ui.tea.area = null; ui.tea.look = 'idle'; ui.tea.err = ''; ui.tea.pick = 'new'; rerender(); },
@@ -2289,7 +2311,10 @@
       var sub = ui.pay.sub, d = dyn(BC_MEMBER.id);
       var mine = fromServerOrder(paid);
       ORDERS = [mine].concat(teaOrders().filter(function (o) { return o.id !== mine.id; }));
-      if (ui.tea.pick === 'new' || !addrList().length) { var nsv = addrToSaved(ui.tea); nsv.label = addrList().some(function (a) { return a.label === 'Home'; }) ? 'Other' : 'Home'; ui.tea.pick = addrUpsert(nsv).id; }
+      if (ui.tea.pick === 'new' || !addrList().length) {   /* a new address typed at checkout is saved to this account */
+        var nsv = addrToSaved(ui.tea); nsv.label = addrList().some(function (a) { return a.label === 'Home'; }) ? 'Other' : 'Home';
+        addrUpsert(nsv).then(function (saved) { ui.tea.pick = saved.id; }, function () {});
+      }
       d.spend.tea = (d.spend.tea || 0) + sub;
       save();
       ui.tea.qty = teaBlankBag(); ui.pay = null;
@@ -2446,7 +2471,11 @@
     logout: function () {
       BCAPI.post('/auth/logout').catch(function () {});
       try { window.google.accounts.id.disableAutoSelect(); } catch (e) {}
-      ME = null; ORDERS = null; ordersAt = 0; applyProfile(); SES.authed = false; SES.pending = null; saveSes(); go('welcome');
+      ME = null; ORDERS = null; ordersAt = 0; ADDRS = null; ADDRS_FOR = null;
+      /* Nothing of this account's checkout stays in memory for whoever signs in next on this browser */
+      ui.tea = { qty: teaBlankBag(), addr: { pin: '', name: '', house: '', street: '' }, area: null, look: 'idle', err: '', focusNext: false };
+      ui.addrEd = null; ui.pay = null; ui.stk = null;
+      applyProfile(); SES.authed = false; SES.pending = null; saveSes(); go('welcome');
     },
     closeSheet: function () { closeSheet(); },
     wxClose: function () { var w = $('wx'); if (!w) return; w.classList.add('out'); setTimeout(function () { w.remove(); rerender(); }, 350); },
@@ -2519,6 +2548,10 @@
     renderTabs(TAB_OF[r.name] || r.name);
     if (AFTER[r.name]) AFTER[r.name](r.arg);
     if (!keepScroll && ORDER_SCREENS[r.name]) { refreshOrders(); refreshResults(); }   /* pick up orders placed on another device */
+    if (!keepScroll && (r.name === 'addresses' || r.name === 'profile' || r.name === 'tea-address')) {   /* and addresses saved there */
+      var had = JSON.stringify(addrList()), on = r.name;
+      loadAddrs().then(function () { if (parse().name === on && JSON.stringify(addrList()) !== had && !$('adPin')) rerender(); });
+    }
   }
   function rerender() { clearTimers(); render(true); }
 
@@ -2625,6 +2658,6 @@
     applyProfile(); saveSes();
     if (!SES.authed) { render(); return; }
     /* Signed in: load my orders before the first screen so cards and numbers are there straight away */
-    Promise.all([refreshOrders(true), refreshResults(true)]).then(render, render);
+    Promise.all([refreshOrders(true), refreshResults(true), loadAddrs()]).then(render, render);
   });
 })();

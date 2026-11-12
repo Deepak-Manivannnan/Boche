@@ -72,6 +72,25 @@ class User(Base):
     orders: Mapped[list["Order"]] = relationship(back_populates="user")
 
 
+class Address(Base):
+    """A Customer's saved delivery address, visible only to that Customer. An Order keeps its own copy
+    (Order.delivery), so editing or deleting a saved address never changes a past Order."""
+
+    __tablename__ = "addresses"
+    id: Mapped[int] = mapped_column(sa.BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(sa.ForeignKey("users.id"), index=True)
+    label: Mapped[str] = mapped_column(sa.String(20))  # Home, Work or Other
+    name: Mapped[str] = mapped_column(sa.String(100))  # who receives the parcel
+    house: Mapped[str] = mapped_column(sa.String(200))
+    street: Mapped[str] = mapped_column(sa.String(200))
+    pin: Mapped[str] = mapped_column(sa.String(6))
+    po: Mapped[str] = mapped_column(sa.String(100), default="")
+    district: Mapped[str] = mapped_column(sa.String(100))
+    is_default: Mapped[bool] = mapped_column(sa.Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
 # ------------------------------------------------------------------ buying
 
 

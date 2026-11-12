@@ -107,10 +107,12 @@ def create_app(
     from app.draw.routes_admin import router as admin_router
     from app.draw.routes_entries import router as entries_router
     from app.draw.routes_public import router as public_router
+    from app.shop.addresses import router as addresses_router
     from app.shop.routes import router as orders_router
 
     app.include_router(auth_router)
     app.include_router(orders_router)
+    app.include_router(addresses_router)
     app.include_router(entries_router)
     app.include_router(public_router)
     app.include_router(admin_router)

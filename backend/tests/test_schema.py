@@ -20,6 +20,7 @@ EXPECTED_TABLES = {
     "draw_runs",
     "otp_challenges",
     "claims",
+    "addresses",
 }
 
 
