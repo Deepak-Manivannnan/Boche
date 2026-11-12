@@ -1317,10 +1317,12 @@
       mode = one.c.scratched ? 'scratched' : 'unscratched';
       list = [one].concat(open.filter(function (x) { return x.c.scratched === one.c.scratched && x.c.id !== one.c.id; }));
     }
-    return (ui.stk = { key: arg, mode: mode, ids: list.map(function (x) { return x.c.id; }), gone: {} });
+    var ids = list.map(function (x) { return x.c.id; });
+    return (ui.stk = { key: arg, mode: mode, ids: ids, order: ids.slice(), gone: {} });   /* order: Card 1, Card 2… for this visit */
   }
-  /* 3D swap: the front card leaves (cls: swap-back = tips back and sinks behind the stack, swap-out = swings out to
-     the Scratched pile, swap-done = an entered card lifts away) while the card behind rises into its place; then
+  function cardNo(st, id) { return st.order.indexOf(id) + 1; }
+  /* 3D swap: the front card leaves (cls: swap-out = swings out to the side, used for every tap on the card behind;
+     swap-done = an entered card lifts away) while the card behind rises into its place; then
      `apply` changes the stack and the new front settles in. `after` may take over instead (returns true). */
   function stackSwap(cls, apply, after) {
     var s = document.querySelector('.sc-stack'), still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1426,10 +1428,10 @@
     var x = vis[0], c = x.c, n = c.nos.length, behind = vis.slice(1, 3);
     var peeks = behind.map(function (b, k) {
       return '<button class="sc-peek p' + (k + 1) + (b.c.scratched ? '' : ' gold') + '" data-act="stkNext" aria-label="Show the next card">' +
-        (k === 0 ? '<span>Next card · ' + numsLabel(b.c.nos.length) + ic('chev', 13) + '</span>' : '') + '</button>';
+        (k === 0 ? '<span>Card ' + cardNo(st, b.c.id) + ' · ' + numsLabel(b.c.nos.length) + ic('chev', 13) + '</span>' : '') + '</button>';
     }).reverse().join('');
     return head +
-      '<p class="sc-lead"><b>' + vis.length + (vis.length > 1 ? ' cards' : ' card') + '</b> ' + (st.mode === 'scratched' ? 'to enter' : 'to scratch') + ' · Win up to <b>' + inr(BC_DRAW.prizes[0].amount) + '</b> today</p>' +
+      '<p class="sc-lead"><b>' + (st.order.length > 1 ? 'Card ' + cardNo(st, c.id) + ' of ' + st.order.length : '1 card') + '</b> · Win up to <b>' + inr(BC_DRAW.prizes[0].amount) + '</b> today</p>' +
       '<div class="sc-stack s' + behind.length + (ui.stkArrive ? ' arrive' : '') + '">' + peeks +
       '<div class="scard n' + (n === 1 ? 1 : n <= 3 ? 3 : 12) + '" id="scard"><div class="sc-face"><span class="sc-k">' + (n === 1 ? 'Your lucky number' : 'Your ' + n + ' lucky numbers') + '</span>' +
         '<div class="sc-nos">' + c.nos.map(function (no) { return '<span class="sc-no">' + esc(no) + '</span>'; }).join('') + '</div>' +
@@ -2298,7 +2300,7 @@
     stkNext: function () {
       var st = ui.stk, vis = st ? stackCards(st) : []; if (vis.length < 2 || ui.stkJust || ui.stkBusy) return;
       var f = vis[0].c, toPile = f.scratched && st.mode !== 'scratched';
-      stackSwap(toPile ? 'swap-out' : 'swap-back', function () {
+      stackSwap('swap-out', function () {   /* every swap swings the front card out, so it is always visible */
         if (toPile) { st.gone[f.id] = true; toast('Saved under Scratched cards'); }
         else st.ids = st.ids.filter(function (i) { return i !== f.id; }).concat(f.id);
       });
