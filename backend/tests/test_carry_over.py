@@ -125,3 +125,37 @@ def test_a_test_day_needs_ten_tickets_to_close(make_client):
     label = admin.post("/api/admin/test-days").json()["label"]
     res = admin.post(f"/api/admin/test-days/{label}/close", json={})
     assert res.status_code == 409 and "at least 10 tickets" in res.json()["detail"]
+
+
+def test_open_days_made_before_the_move_get_the_ten_pm_schedule(migrated_url, clean_db):
+    """The live database may hold a real day still taking entries with the 8 PM schedule; the migration moves
+    it to 10 PM. Days already sealed or drawn keep the times they ran with."""
+    from alembic import command
+
+    from app.core.migrate import _config
+
+    cfg, engine = _config(migrated_url), sa.create_engine(migrated_url)
+    command.downgrade(cfg, "0006")
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                sa.text(
+                    "INSERT INTO draw_days (label, kind, day, status, closes_at, draw_not_before, "
+                    "publish_not_before) VALUES "
+                    "('2026-11-12', 'real', '2026-11-12', 'open', "
+                    "'2026-11-12 14:30:00', '2026-11-12 14:45:00', '2026-11-12 15:00:00'), "
+                    "('2026-11-11', 'real', '2026-11-11', 'published', "
+                    "'2026-11-11 14:30:00', '2026-11-11 14:45:00', '2026-11-11 15:00:00')"
+                )
+            )
+    finally:
+        command.upgrade(cfg, "head")
+    with engine.connect() as conn:
+        rows = conn.execute(
+            sa.text(
+                "SELECT label, closes_at, draw_not_before, publish_not_before FROM draw_days ORDER BY label"
+            )
+        ).all()
+    engine.dispose()
+    times = {r[0]: tuple(str(t)[11:16] for t in r[1:]) for r in rows}
+    assert times == {"2026-11-11": ("14:30", "14:45", "15:00"), "2026-11-12": ("16:30", "16:45", "17:00")}

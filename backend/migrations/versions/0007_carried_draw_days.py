@@ -1,8 +1,10 @@
-"""A Draw day can be `carried`: at closing time it had fewer Tickets than Winners, so it is not sealed or
-drawn and its entered cards move to the next day's draw (ADR-0011).
+"""The daily schedule moves to 10 PM IST, and a Draw day can be `carried`: at closing time it had fewer
+Tickets than Winners, so it is not sealed or drawn and its entered cards move to the next day (ADR-0011).
 
-Only the status check constraint changes. Where the database does not keep check constraints (TiDB with
-them switched off), there is nothing to change.
+- Real days still taking entries were made with the 8:00 / 8:15 / 8:30 PM schedule; they move two hours
+  later. (An open real day always has that standard schedule: Skip seals it, Delete restores it.)
+- The status check constraint allows `carried`. Where the database does not keep check constraints (TiDB
+  with them switched off), there is nothing to change.
 
 Revision ID: 0007
 Revises: 0006
@@ -42,8 +44,17 @@ def _replace(values: tuple[str, ...]) -> None:
     op.execute(f"ALTER TABLE draw_days ADD CONSTRAINT {NAME} CHECK (status IN ({allowed}))")
 
 
+SHIFT = (
+    "UPDATE draw_days SET closes_at = closes_at {op} INTERVAL 2 HOUR, "
+    "draw_not_before = draw_not_before {op} INTERVAL 2 HOUR, "
+    "publish_not_before = publish_not_before {op} INTERVAL 2 HOUR "
+    "WHERE kind = 'real' AND status = 'open'"
+)
+
+
 def upgrade() -> None:
     _replace(NEW)
+    op.execute(SHIFT.format(op="+"))
 
 
 def downgrade() -> None:
@@ -51,3 +62,4 @@ def downgrade() -> None:
     if carried:
         raise RuntimeError(f"{carried} Draw days are 'carried'; the older schema has no such status")
     _replace(OLD)
+    op.execute(SHIFT.format(op="-"))
