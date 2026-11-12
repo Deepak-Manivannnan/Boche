@@ -75,6 +75,10 @@ _Avoid_: Checksum, signature, root
 The single numbered drand value, released at 8:15 PM IST and named in the Seal before it exists, that supplies the draw's randomness.
 _Avoid_: Seed (the seed is derived from it), random number
 
+**Delete (a draw)**:
+An Admin erasing today's completed draw (Winners, Claims, sealed list and Seal) so the day reopens empty and can be drawn again (ADR-0009). Recorded in the run log and visible in the Seal's GitHub history.
+_Avoid_: Reset, redraw
+
 **Draw run**:
 One execution of the draw for a Draw day. Every Draw run is logged; all Draw runs of a day give the same Winners.
 _Avoid_: Re-draw, spin

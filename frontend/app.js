@@ -1496,7 +1496,8 @@
   AFTER.draw = function () {
     refreshResults();
     maybeReveal();
-    var el = $('drawCd'); if (!el) return;
+    var el = $('drawCd');
+    if (!el) { timers.push(setInterval(function () { refreshResults(true); }, 60000)); return; }   /* notices a deleted draw */
     var polled = Date.now();   /* results are published at 8:30 PM IST, or right after an early (Skip) draw */
     function tick() {
       var ms = publishAt(dayKey()) - new Date();
@@ -1515,7 +1516,7 @@
 
   /* ----- Results reveal (frontend/reveal.js), over published winners only: plays each time the Lucky Draw page is
      opened while today's result is published. At midnight today's result gives way to the next draw's countdown.
-     A data refresh (rerender) never replays it; if the result is published while the page is open, it plays then. ----- */
+     A data refresh (rerender) never replays the same winners; a result published while the page is open plays then. ----- */
   var REVEAL_STOP = null;
   function prizeAmount(rank) { var r = 0, a = 0; BC_DRAW.prizes.forEach(function (p) { for (var k = 0; k < p.count; k++) { r++; if (r === rank) a = p.amount; } }); return a; }
   function playReveal(label, winners, mine, onDone) {
@@ -1529,8 +1530,10 @@
   }
   function maybeReveal() {
     var key = dayKey(), list = RESULTS[key];
-    if (!list || REVEAL_STOP || !ui.revealDue) return;
-    ui.revealDue = false;
+    if (!list || REVEAL_STOP) return;
+    var sig = key + ':' + list.map(function (w) { return w.ticket; }).join(',');
+    if (!ui.revealDue && ui.revealSig === sig) return;   /* a new winner list (after a deleted draw) plays even mid-visit */
+    ui.revealDue = false; ui.revealSig = sig;
     var mine = allCards().filter(function (x) { return x.c.drawDate === key; }).reduce(function (t, x) { return t.concat(x.c.nos); }, []);
     playReveal(key, list, mine);
   }
@@ -1857,7 +1860,11 @@
       '<p class="fine center mt12">Code sent · valid until ' + istTime(d.otpExpiresAt) + ' · <a class="link" href="javascript:void(0)" data-act="admSendOtp">Send a new code</a></p>';
     else body = '<div class="field-l">Winners · drawn at ' + istTime(d.drawnAt, true) + '</div><div class="list">' + (d.winners || []).map(function (x) {
         return '<div class="li win"><div class="li-main"><div class="li-t">' + x.rank + ({ 1: 'st', 2: 'nd', 3: 'rd' }[x.rank] || 'th') + ' prize</div><div class="li-s">Position ' + x.position + ' in the list</div></div><div class="win-r"><span class="lno">' + esc(x.ticket) + '</span></div></div>';
-      }).join('') + '</div><p class="fine center mt12">Results go public at ' + istTime(d.publishNotBefore) + '.</p>';
+      }).join('') + '</div><p class="fine center mt12">Results go public at ' + istTime(d.publishNotBefore) + '.</p>' +
+      (!d.canDelete ? '' : A.delArm === d.label
+        ? '<div class="rule-note mt16">' + ic('shield', 16) + '<span>Delete today’s draw? The winners, their claims and the sealed list are erased, and the ' + num(d.ticketCount || 0) + ' tickets go back to their owners to enter again. Today’s draw reopens empty and closes at 8:00 PM. This cannot be undone.</span></div>' +
+          '<div class="btn-row mt12"><button class="btn btn-line" data-act="admDelCancel">Cancel</button><button class="btn btn-gold" data-act="admDel">Yes, delete this draw</button></div>'
+        : '<button class="btn btn-line mt16" data-act="admDelArm">' + ic('x', 16) + 'Delete this draw</button>');
     return head + '<div class="pad"><div class="field-l" style="margin-top:16px">Draw day</div><div class="chips scroll-x">' + A.days.map(function (x) {
         return '<button class="chip' + (x.label === A.sel ? ' on' : '') + '" data-act="admPick" data-id="' + esc(x.label) + '">' + (x.kind === 'test' ? 'Test ' + esc(x.label.replace(/^test-/, '')) : esc(x.label)) + '</button>';
       }).join('') + '</div>' +
@@ -1990,7 +1997,18 @@
     },
     staffOutlet: function (el) { SES.outlet = el.dataset.id; saveSes(); rerender(); },
     staffLogout: function () { SES.staffId = null; saveSes(); ui.staffMobile = ''; go('welcome'); },
-    admPick: function (el) { ui.adm.sel = el.dataset.id; ui.adm.skipArm = null; rerender(); },
+    admPick: function (el) { ui.adm.sel = el.dataset.id; ui.adm.skipArm = ui.adm.delArm = null; rerender(); },
+    /* Delete today's completed draw: the day reopens empty (ADR-0009); first tap only asks */
+    admDelArm: function () { var d = admDay(); if (d && d.canDelete) { ui.adm.delArm = d.label; rerender(); } },
+    admDelCancel: function () { ui.adm.delArm = null; rerender(); },
+    admDel: function () {
+      var d = admDay(); if (!d || ui.adm.busy || ui.adm.delArm !== d.label) return; ui.adm.busy = true;
+      BCAPI.post('/admin/draw-days/' + encodeURIComponent(d.label) + '/delete').then(function (day) {
+        ui.adm.busy = false; ui.adm.delArm = null;
+        ui.adm.days = ui.adm.days.map(function (x) { return x.label === day.label ? day : x; });
+        rerender(); toast('Draw deleted · today’s draw is open again');
+      }, function (e) { ui.adm.busy = false; ui.adm.delArm = null; toast(e.message || 'Could not delete the draw'); admLoad().then(rerender); });
+    },
     /* Skip: a real day is sealed now (drand round ~30 s ahead), then the usual OTP → draw; first tap only asks */
     admSkipArm: function () { var d = admDay(); if (d && d.canSkip) { ui.adm.skipArm = d.label; rerender(); } },
     admSkipCancel: function () { ui.adm.skipArm = null; rerender(); },

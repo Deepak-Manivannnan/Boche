@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import ist_date, ist_time
 from app.db import models as m
+from app.draw.drawrun import log_run
 from app.draw.lifecycle import close_day
 from engine import WINNER_COUNT
 
@@ -112,3 +113,83 @@ def skip_to_draw(db: Session, label: str, now: datetime) -> m.DrawDay:
     day.publish_not_before = day.draw_not_before
     db.commit()
     return day
+
+
+# ---------------------------------------------------------------- Delete today's draw (ADR-0009)
+
+
+class DeleteRefused(Exception):
+    def __init__(self, status: int, detail: str):
+        super().__init__(detail)
+        self.status, self.detail = status, detail
+
+
+def can_delete(day: m.DrawDay, now: datetime) -> bool:
+    """Today's real draw, once drawn, until 8:00 PM IST. Reopened later than that, it would close again at
+    once with no Tickets and could never be drawn."""
+    return (
+        day.kind == "real"
+        and day.status in ("drawn", "published")
+        and day.day == ist_date(now)
+        and now < ist_time(day.day, *ENTRIES_CLOSE)
+    )
+
+
+def delete_draw(db: Session, label: str, admin: m.User, now: datetime, publisher) -> m.DrawDay:
+    """Erase today's completed draw and reopen the day empty: Winners, Claims, OTPs, the sealed list and its
+    Seal on GitHub go; the entered cards go back to their owners to enter again. The day then runs as usual
+    (Skip, or close at 8:00 PM). The hash-chained run log keeps a "deleted" entry with what was erased."""
+    day = db.scalar(sa.select(m.DrawDay).where(m.DrawDay.label == label).with_for_update())
+    if day is None:
+        raise DeleteRefused(404, "No such Draw day")
+    if not can_delete(day, now):
+        if day.kind != "real":
+            raise DeleteRefused(409, "Only a real day's draw can be deleted")
+        if day.status not in ("drawn", "published"):
+            raise DeleteRefused(409, "This draw has not been run yet")
+        raise DeleteRefused(409, "Only today's draw can be deleted, before 8:00 PM")
+
+    if publisher is not None:  # first, so a GitHub failure changes nothing
+        try:
+            publisher.delete(day.label)
+        except OSError as e:
+            db.rollback()
+            raise DeleteRefused(
+                502, "Could not remove the Seal from GitHub; nothing was deleted. Try again."
+            ) from e
+
+    erased = {
+        "fingerprint": day.fingerprint,
+        "round": day.drand_round,
+        "ticket_count": day.ticket_count,
+        "winners": [w["ticket"] for w in day.result.winners] if day.result else [],
+    }
+    tickets = sa.select(m.Ticket.id).where(m.Ticket.draw_day_id == day.id)
+    db.execute(sa.delete(m.Claim).where(m.Claim.ticket_id.in_(tickets.scalar_subquery())))
+    db.execute(sa.delete(m.DrawResult).where(m.DrawResult.draw_day_id == day.id))
+    db.execute(sa.delete(m.OtpChallenge).where(m.OtpChallenge.draw_day_id == day.id))
+    db.execute(sa.update(m.Ticket).where(m.Ticket.draw_day_id == day.id).values(draw_day_id=None))
+    db.execute(
+        sa.update(m.Card).where(m.Card.draw_day_id == day.id).values(draw_day_id=None, entered_at=None)
+    )
+    day.status = "open"
+    day.closes_at = ist_time(day.day, *ENTRIES_CLOSE)
+    day.draw_not_before = ist_time(day.day, *DRAW_FROM)
+    day.publish_not_before = ist_time(day.day, *PUBLISH_AT)
+    for field in (
+        "ticket_count",
+        "ticket_csv",
+        "fingerprint",
+        "drand_round",
+        "sealed_at",
+        "seal_json",
+        "seal_commit_sha",
+        "seal_url",
+        "drawn_at",
+        "published_at",
+    ):
+        setattr(day, field, None)
+    log_run(db, day, admin, "deleted", now, **erased)
+    db.commit()
+    db.expire_all()
+    return db.scalar(sa.select(m.DrawDay).where(m.DrawDay.label == label))

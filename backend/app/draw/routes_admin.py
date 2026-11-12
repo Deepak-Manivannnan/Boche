@@ -1,7 +1,8 @@
-"""Admin: see Draw days, close today's entries early (Skip), send the Founder's OTP, and enter it to run the
-draw. Nothing else.
+"""Admin: see Draw days, close today's entries early (Skip), send the Founder's OTP, enter it to run the draw,
+and delete today's completed draw so the day starts again (ADR-0009). Nothing else.
 
-There is deliberately no endpoint that redraws, edits or rejects Winners."""
+There is no endpoint that edits or rejects Winners. Deleting erases the whole draw and empties the day; it is
+recorded in the run log and stays visible in the Seal's GitHub history."""
 
 import logging
 import threading
@@ -16,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_db, require_admin
 from app.db import models as m
 from app.draw.drand import round_released_at
-from app.draw.drawdays import SkipRefused, can_skip, skip_to_draw
+from app.draw.drawdays import DeleteRefused, SkipRefused, can_delete, can_skip, delete_draw, skip_to_draw
 from app.draw.drawrun import DrawRefused, run_draw
 from app.draw.lifecycle import publish_results, publish_seals
 from app.draw.otp import OtpRefused, active_expiry, request_otp
@@ -87,6 +88,7 @@ def day_json(db: Session, day: m.DrawDay, now) -> dict:
         "sealPublished": bool(day.seal_commit_sha),
         "canRequestOtp": day.status == "sealed" and now >= day.draw_not_before,
         "canSkip": can_skip(db, day, now),
+        "canDelete": can_delete(day, now),
         "otpExpiresAt": _iso(otp_until),
         "drawnAt": _iso(day.drawn_at),
         "randomness": day.result.randomness if day.result else None,
@@ -130,6 +132,19 @@ def skip_wait(label: Label, request: Request, db: Db) -> dict:
     log.warning("entries for %s closed early (Skip) by admin user %s", label, admin.id)
     publish_seals(db, state.seal_publisher)
     db.refresh(day)
+    return day_json(db, day, now)
+
+
+@router.post("/draw-days/{label}/delete")
+def delete_todays_draw(label: Label, request: Request, db: Db) -> dict:
+    """Erase today's completed draw (Winners, Claims, sealed list, Seal) and reopen the day empty."""
+    admin = require_admin(request, db)
+    state, now = request.app.state, request.app.state.clock.now()
+    try:
+        day = delete_draw(db, label, admin, now, state.seal_publisher)
+    except DeleteRefused as e:
+        raise HTTPException(status_code=e.status, detail=e.detail) from e
+    log.warning("draw for %s deleted by admin user %s", label, admin.id)
     return day_json(db, day, now)
 
 

@@ -33,6 +33,12 @@ class FakeSeals:
         self.files.setdefault(label, content)
         return f"sha-{label}", f"https://github.com/acme/seals/blob/main/seals/{label}.json"
 
+    def delete(self, label: str) -> bool:
+        if self.fail_next:
+            self.fail_next -= 1
+            raise OSError("GitHub unreachable")
+        return self.files.pop(label, None) is not None
+
 
 @pytest.fixture
 def seals(make_client):

@@ -33,6 +33,35 @@ class FakeGitHub:
         }
 
 
+class FakeGitHubWithDelete(FakeGitHub):
+    def __init__(self, existing=None, delete_status=200):
+        super().__init__(existing)
+        self.deletes, self.delete_status = [], delete_status
+
+    def __call__(self, method, url, headers, body=None):
+        if method == "DELETE":
+            self.deletes.append(json.loads(body))
+            return self.delete_status, {}
+        return super().__call__(method, url, headers, body)
+
+
+def test_deleting_a_seal_removes_that_file_on_main():
+    fake = FakeGitHubWithDelete(existing=SEAL)
+    assert publisher(fake).delete("2026-11-10") is True
+    assert fake.deletes[0]["sha"] == "blob1" and fake.deletes[0]["branch"] == "main"
+
+
+def test_deleting_a_missing_seal_does_nothing():
+    fake = FakeGitHubWithDelete()
+    assert publisher(fake).delete("2026-11-10") is False
+    assert fake.deletes == []
+
+
+def test_a_failed_delete_raises():
+    with pytest.raises(OSError):
+        publisher(FakeGitHubWithDelete(existing=SEAL, delete_status=409)).delete("2026-11-10")
+
+
 def publisher(fake):
     return GitHubSealPublisher("acme/seals", "tok", http=fake)
 

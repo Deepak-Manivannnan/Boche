@@ -59,13 +59,15 @@ def test_an_admin_removed_from_the_list_loses_access_immediately(w):
     assert w.admin.get("/api/admin/draw-days").status_code == 403
 
 
-def test_the_admin_api_offers_no_way_to_redraw_edit_or_reject_winners(w):
+def test_the_admin_api_offers_no_way_to_edit_or_reject_winners(w):
+    """Every admin route is listed here. Delete (ADR-0009) erases a whole draw; nothing edits Winners."""
     paths = w.admin.get("/openapi.json").json()["paths"]
     admin_routes = {(p, tuple(sorted(k.upper() for k in ops))) for p, ops in paths.items() if "/admin/" in p}
     assert admin_routes == {
         ("/api/admin/draw-days", ("GET",)),
         ("/api/admin/draw-days/{label}", ("GET",)),
         ("/api/admin/draw-days/{label}/skip", ("POST",)),  # closes today's entries early; draws nothing
+        ("/api/admin/draw-days/{label}/delete", ("POST",)),  # erases today's whole draw (ADR-0009)
         ("/api/admin/draw-days/{label}/otp", ("POST",)),
         ("/api/admin/draw-days/{label}/run", ("POST",)),
         ("/api/admin/orders/{order_id}/refund", ("POST",)),

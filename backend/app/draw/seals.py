@@ -65,3 +65,25 @@ class GitHubSealPublisher:
         if status not in (200, 201):
             raise OSError(f"GitHub answered {status} when committing the Seal for {label}")
         return created["commit"]["sha"], created["content"]["html_url"]
+
+    def delete(self, label: str) -> bool:
+        """Remove seals/<label>.json when an Admin deletes that day's draw (ADR-0009). Returns False if it was
+        not there. The commit history keeps the old Seal, so the Verifier reports a re-done day's Seal as
+        edited: deleting a draw stays publicly visible."""
+        url = f"{API}/repos/{self.repo}/contents/seals/{label}.json"
+        status, existing = self._http("GET", url, self._headers)
+        if status == 404:
+            return False
+        if status != 200:
+            raise OSError(f"GitHub answered {status} when reading the Seal for {label}")
+        body = json.dumps(
+            {
+                "message": f"Delete the Seal for Draw day {label} (draw deleted by an Admin)",
+                "sha": existing["sha"],
+                "branch": self.branch,
+            }
+        )
+        status, _ = self._http("DELETE", url, self._headers, body)
+        if status != 200:
+            raise OSError(f"GitHub answered {status} when deleting the Seal for {label}")
+        return True
