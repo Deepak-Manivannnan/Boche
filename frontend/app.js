@@ -1319,6 +1319,20 @@
     }
     return (ui.stk = { key: arg, mode: mode, ids: list.map(function (x) { return x.c.id; }), gone: {} });
   }
+  /* 3D swap: the front card leaves (cls: swap-back = tips back and sinks behind the stack, swap-out = swings out to
+     the Scratched pile, swap-done = an entered card lifts away) while the card behind rises into its place; then
+     `apply` changes the stack and the new front settles in. `after` may take over instead (returns true). */
+  function stackSwap(cls, apply, after) {
+    var s = document.querySelector('.sc-stack'), still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    function finish() {
+      ui.stkBusy = false; apply();
+      if (parse().name !== 'scratch' || (after && after())) return;
+      ui.stkArrive = true; rerender();
+    }
+    if (!s || still) { finish(); return; }
+    ui.stkBusy = true; s.classList.add(cls);
+    setTimeout(finish, 460);   /* not a page timer: the stack must change even if a refresh happens meanwhile */
+  }
   function stackCards(st) {   /* what is still in the stack, front first (a just-entered card stays a moment) */
     return st.ids.map(cardById).filter(function (x) { return x && !st.gone[x.c.id] && (!x.c.submitted || x.c.id === ui.stkJust); });
   }
@@ -1416,7 +1430,7 @@
     }).reverse().join('');
     return head +
       '<p class="sc-lead"><b>' + vis.length + (vis.length > 1 ? ' cards' : ' card') + '</b> ' + (st.mode === 'scratched' ? 'to enter' : 'to scratch') + ' · Win up to <b>' + inr(BC_DRAW.prizes[0].amount) + '</b> today</p>' +
-      '<div class="sc-stack s' + behind.length + '">' + peeks +
+      '<div class="sc-stack s' + behind.length + (ui.stkArrive ? ' arrive' : '') + '">' + peeks +
       '<div class="scard n' + (n === 1 ? 1 : n <= 3 ? 3 : 12) + '" id="scard"><div class="sc-face"><span class="sc-k">' + (n === 1 ? 'Your lucky number' : 'Your ' + n + ' lucky numbers') + '</span>' +
         '<div class="sc-nos">' + c.nos.map(function (no) { return '<span class="sc-no">' + esc(no) + '</span>'; }).join('') + '</div>' +
         '<span class="sc-s">' + (c.pack ? esc(c.pack) + ' pack · ' : '') + esc(x.o.date) + '</span></div>' +
@@ -1426,6 +1440,7 @@
       '<div id="scBody">' + stackBody(x, st, behind.length) + '</div></div></div>';
   };
   AFTER.scratch = function () {
+    ui.stkArrive = false;   /* the settle-in plays once, not on later refreshes */
     var id = ui.stkFront, cv = $('scCanvas'); if (!cv || !id) return;
     var box = $('scard').getBoundingClientRect(), dpr = window.devicePixelRatio || 1, ctx = cv.getContext('2d'), w = box.width, h = box.height;
     cv.width = w * dpr; cv.height = h * dpr; ctx.scale(dpr, dpr);
@@ -2281,11 +2296,12 @@
     /* Tap the card behind: it comes forward. A scratched front card waits under Scratched cards (it leaves this
        stack, unless this is the Scratched pile); an unscratched one goes to the back of the stack. */
     stkNext: function () {
-      var st = ui.stk, vis = st ? stackCards(st) : []; if (vis.length < 2 || ui.stkJust) return;
-      var f = vis[0].c;
-      if (f.scratched && st.mode !== 'scratched') { st.gone[f.id] = true; toast('Saved under Scratched cards'); }
-      else st.ids = st.ids.filter(function (i) { return i !== f.id; }).concat(f.id);
-      rerender();
+      var st = ui.stk, vis = st ? stackCards(st) : []; if (vis.length < 2 || ui.stkJust || ui.stkBusy) return;
+      var f = vis[0].c, toPile = f.scratched && st.mode !== 'scratched';
+      stackSwap(toPile ? 'swap-out' : 'swap-back', function () {
+        if (toPile) { st.gone[f.id] = true; toast('Saved under Scratched cards'); }
+        else st.ids = st.ids.filter(function (i) { return i !== f.id; }).concat(f.id);
+      });
     },
     scratchReveal: function (el) { var x = cardById(el.dataset.id); if (!x || x.c.scratched) return; x.c.scratched = true; markScratched(x.c.id); rerender(); },
     drawSubmit: function (el) {
@@ -2305,9 +2321,10 @@
            left, back to the Lucky Draw page) */
         ui.stkJust = c.id; rerender();
         timers.push(setTimeout(function () {
-          ui.stkJust = null;
-          if (parse().name !== 'scratch') return;
-          if (ui.stk && !stackCards(ui.stk).length) { toast('All cards entered · good luck!'); go('draw'); } else rerender();
+          if (parse().name !== 'scratch') { ui.stkJust = null; return; }
+          stackSwap('swap-done', function () { ui.stkJust = null; }, function () {
+            if (ui.stk && !stackCards(ui.stk).length) { toast('All cards entered · good luck!'); go('draw'); return true; }
+          });
         }, 1400));
       }, function (e) {
         shown.then(function () {
