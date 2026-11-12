@@ -46,7 +46,7 @@ A backend behind the existing screens makes the flow real:
 17. As a Customer who won, I want a personal "You won ₹X" celebration, so that the moment feels special.
 18. As a Customer who didn't win, I want a kind "Better luck next time" message, so that I feel encouraged to play again.
 19. As a Customer, I want to skip the reveal animation, so that I can see the results quickly.
-20. As a Customer, I want the reveal to play only once per day on my device, so that it doesn't repeat every time I open the screen.
+20. As a Customer, I want the reveal to play each time I open the Lucky Draw screen while today's result is published (until midnight, when the next draw's countdown takes over), with a Skip button, so that I can rewatch it.
 21. As a Customer, I want to see, for each of my Tickets, whether it was included in tonight's sealed list, so that I know it counted.
 22. As a Customer, I want to see which of my Tickets won and what they won, so that I can Claim my prize.
 23. As a Customer, I want Winners shown with a masked name and mobile number, so that winners' privacy is protected.

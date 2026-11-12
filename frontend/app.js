@@ -1513,7 +1513,9 @@
     tick(); timers.push(setInterval(tick, 1000));
   };
 
-  /* ----- Results reveal (frontend/reveal.js): once per device per Draw day, over published winners only ----- */
+  /* ----- Results reveal (frontend/reveal.js), over published winners only: plays each time the Lucky Draw page is
+     opened while today's result is published. At midnight today's result gives way to the next draw's countdown.
+     A data refresh (rerender) never replays it; if the result is published while the page is open, it plays then. ----- */
   var REVEAL_STOP = null;
   function prizeAmount(rank) { var r = 0, a = 0; BC_DRAW.prizes.forEach(function (p) { for (var k = 0; k < p.count; k++) { r++; if (r === rank) a = p.amount; } }); return a; }
   function playReveal(label, winners, mine, onDone) {
@@ -1526,9 +1528,9 @@
     });
   }
   function maybeReveal() {
-    var key = dayKey(), list = RESULTS[key], seen = 'bocheclub-reveal-' + key + '-' + ((ME && (ME.id || ME.email)) || 'guest');
-    if (!list || REVEAL_STOP) return;
-    try { if (localStorage.getItem(seen)) return; localStorage.setItem(seen, '1'); } catch (e) { return; }
+    var key = dayKey(), list = RESULTS[key];
+    if (!list || REVEAL_STOP || !ui.revealDue) return;
+    ui.revealDue = false;
     var mine = allCards().filter(function (x) { return x.c.drawDate === key; }).reduce(function (t, x) { return t.concat(x.c.nos); }, []);
     playReveal(key, list, mine);
   }
@@ -2424,7 +2426,7 @@
     if (!keepScroll) trackNav();
     var r = resolve(parse()), scr = $('screen'), top = scr.scrollTop;
     if (REVEAL_STOP && r.name !== 'draw' && r.name !== 'admin-draw') REVEAL_STOP();
-    if (!keepScroll) { clearTimers(); closeSheet(true); ui.pageMenu = false; ui.teaSeen = false; }
+    if (!keepScroll) { clearTimers(); closeSheet(true); ui.pageMenu = false; ui.teaSeen = false; ui.revealDue = r.name === 'draw'; }
     $('device').classList.toggle('has-tabs', !!TABS[r.name]);
     scr.innerHTML = SCREENS[r.name](r.arg);
     scr.scrollTop = keepScroll ? top : 0;
