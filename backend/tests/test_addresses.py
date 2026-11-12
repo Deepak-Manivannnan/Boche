@@ -1,6 +1,7 @@
 """Saved delivery addresses are stored per account on the server: two Customers on the same browser never
 see or change each other's addresses."""
 
+from api_support import google_sign_up
 from test_orders_api import DELIVERY, buy
 
 HOME = {**DELIVERY, "label": "Home"}
@@ -57,7 +58,7 @@ def test_signing_out_and_in_as_someone_else_shows_only_their_addresses(make_clie
     save(browser, HOME)
     browser.post("/api/auth/logout")
     assert browser.get("/api/me/addresses").status_code == 401
-    browser.post("/api/auth/google", json={"credential": "meera-token-xxxxxxxxxx"})
+    google_sign_up(browser, "meera")
     assert mine(browser) == []
 
 

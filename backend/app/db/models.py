@@ -62,10 +62,15 @@ def enum(*values: str, name: str) -> sa.Enum:
 class User(Base):
     __tablename__ = "users"
     id: Mapped[int] = mapped_column(sa.BigInteger, primary_key=True, autoincrement=True)
-    google_sub: Mapped[str] = mapped_column(sa.String(64), unique=True)
-    email: Mapped[str] = mapped_column(sa.String(320), unique=True)
+    # An account made with a mobile number has no Google account (or email) until it connects one.
+    google_sub: Mapped[str | None] = mapped_column(sa.String(64), unique=True)
+    email: Mapped[str | None] = mapped_column(sa.String(320), unique=True)
     name: Mapped[str] = mapped_column(sa.String(200))
-    mobile: Mapped[str | None] = mapped_column(sa.String(20))
+    mobile: Mapped[str | None] = mapped_column(
+        sa.String(20), unique=True
+    )  # 10 digits, one account per number
+    mobile_verified_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    age: Mapped[int | None] = mapped_column(sa.Integer)
     picture: Mapped[str | None] = mapped_column(
         sa.String(1000)
     )  # Google profile photo URL, set at each sign-in
@@ -73,6 +78,21 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
     orders: Mapped[list["Order"]] = relationship(back_populates="user")
+
+
+class LoginOtp(Base):
+    """A one-time code sent by SMS to sign in or sign up with a mobile number. Stored salted and hashed;
+    expires, allows a few wrong tries, and is used once."""
+
+    __tablename__ = "login_otps"
+    id: Mapped[int] = mapped_column(sa.BigInteger, primary_key=True, autoincrement=True)
+    mobile: Mapped[str] = mapped_column(sa.String(20), index=True)
+    code_hash: Mapped[str] = mapped_column(sa.String(128))
+    ip: Mapped[str] = mapped_column(sa.String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    attempts: Mapped[int] = mapped_column(sa.Integer, default=0)
+    consumed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
 
 class Address(Base):

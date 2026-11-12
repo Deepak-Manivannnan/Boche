@@ -50,7 +50,7 @@ def clean_db(db_engine):
     _delete_all_rows(db_engine)
 
 
-from api_support import PAYMENT_SECRET  # noqa: E402
+from api_support import PAYMENT_SECRET, CodeCatcher, google_sign_up  # noqa: E402
 
 
 class FakeGoogle:
@@ -89,14 +89,15 @@ def make_client(migrated_url, clean_db):
     clock = FixedClock(datetime(2026, 11, 10, 6, 30, tzinfo=UTC))  # 12:00 IST
     app = create_app(settings=settings, verify_google=FakeGoogle(), clock=clock)
     app.state.test_clock = clock
+    app.state.login_sms_sender = CodeCatcher()
     clients = []
 
     def make(name: str | None = "arun") -> TestClient:
+        """A browser signed in as <name>: Google, then (first time) a verified mobile number and a profile."""
         client = TestClient(app)
         clients.append(client)
         if name:
-            res = client.post("/api/auth/google", json={"credential": f"{name}-token-xxxxxxxxxx"})
-            assert res.status_code == 200, res.text
+            google_sign_up(client, name)
         return client
 
     yield make

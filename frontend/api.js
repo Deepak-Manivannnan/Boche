@@ -53,6 +53,7 @@ var BCAPI = (function () {
     get: function (path) { return request('GET', path); },
     post: function (path, body) { return guarded('POST', path, body === undefined ? {} : body); },
     put: function (path, body) { return guarded('PUT', path, body === undefined ? {} : body); },
+    patch: function (path, body) { return guarded('PATCH', path, body === undefined ? {} : body); },
     del: function (path) { return guarded('DELETE', path); }
   };
 })();

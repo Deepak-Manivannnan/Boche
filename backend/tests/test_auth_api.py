@@ -3,6 +3,7 @@
 from datetime import UTC, datetime
 
 import pytest
+from api_support import CodeCatcher, complete_signup, mobile_for
 from fastapi.testclient import TestClient
 
 from app.auth.google import AuthError, AuthUnavailable, GoogleIdentity
@@ -47,11 +48,16 @@ def api(migrated_url, clean_db, google, clock):
         cookie_secure=False,
     )
     with TestClient(create_app(settings=settings, verify_google=google, clock=clock)) as client:
+        client.app.state.login_sms_sender = CodeCatcher()
         yield client
 
 
 def sign_in(api, credential="arun-token"):
-    return api.post("/api/auth/google", json={"credential": credential + "x" * 10})
+    """Continue with Google; a new customer then verifies a mobile number and creates the profile."""
+    res = api.post("/api/auth/google", json={"credential": credential + "x" * 10})
+    if res.status_code == 200 and "signup" in res.json():
+        return complete_signup(api, mobile_for(credential), res.json()["signup"]["name"])
+    return res
 
 
 @pytest.fixture(autouse=True)
@@ -79,14 +85,15 @@ def test_the_session_cookie_is_http_only_and_same_site_lax(api):
     assert "path=/" in cookie
 
 
-def test_signing_in_again_updates_the_same_customer(api, google):
+def test_signing_in_again_is_the_same_customer_and_keeps_their_own_name(api, google):
     first = sign_in(api).json()
+    assert api.patch("/api/me", json={"name": "Arun Mathew K"}).status_code == 200
     google.tokens["arun-token" + "x" * 10] = GoogleIdentity(
         "g-arun", "arun@example.com", "Arun M. Mathew", None
     )
     again = sign_in(api).json()
     assert again["id"] == first["id"]
-    assert again["name"] == "Arun M. Mathew"
+    assert again["name"] == "Arun Mathew K"  # the name is the customer's own; Google no longer overwrites it
 
 
 ARUN_PHOTO = "https://lh3.googleusercontent.com/a/arun-photo=s96-c"

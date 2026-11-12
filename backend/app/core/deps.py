@@ -36,6 +36,8 @@ def user_json(user: m.User) -> dict:
         "firstName": user.name.split(" ")[0],
         "email": user.email,
         "mobile": user.mobile,
+        "age": user.age,
+        "hasGoogle": bool(user.google_sub),  # false: signs in with the mobile number only
         "picture": user.picture,
         "role": user.role,
     }

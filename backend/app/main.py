@@ -13,6 +13,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.auth.google import GoogleTokenVerifier, Sessions
+from app.auth.mobile import PendingSignups
 from app.core.clock import Clock, SystemClock
 from app.core.config import REPO_ROOT, Settings
 from app.draw.drand import fetch_round
@@ -59,6 +60,8 @@ def create_app(
         if settings.sms_mode == "msg91" and settings.msg91_auth_key and settings.msg91_template_id
         else LogOtpSender()
     )
+    app.state.login_sms_sender = app.state.otp_sender  # sign-in codes go out the same way (MSG91 or the log)
+    app.state.pending_signups = PendingSignups(settings.session_secret, settings.cookie_secure, clock)
     app.state.drand_fetch = fetch_round
 
     @app.middleware("http")

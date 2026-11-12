@@ -21,6 +21,7 @@ EXPECTED_TABLES = {
     "otp_challenges",
     "claims",
     "addresses",
+    "login_otps",
 }
 
 
