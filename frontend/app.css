@@ -661,8 +661,8 @@ textarea.input { height: 84px; padding: 12px 16px; resize: none; }
 .sc-stack[class*="swap-"] .sc-peek.p1 { animation: sc-rise-1 .46s cubic-bezier(.3, .7, .3, 1) forwards; }
 .sc-stack[class*="swap-"] .sc-peek.p2 { animation: sc-rise-2 .46s cubic-bezier(.3, .7, .3, 1) forwards; }
 .sc-stack[class*="swap-"] .sc-peek span { opacity: 0; }
-.sc-stack.arrive .scard { animation: sc-settle .36s cubic-bezier(.2, .9, .3, 1.15) both; }
-.sc-stack.arrive .sc-peek { animation: sc-peek-in .36s ease-out both; }
+.sc-stack.arrive:not([class*="swap-"]) .scard { animation: sc-settle .36s cubic-bezier(.2, .9, .3, 1.15) both; }
+.sc-stack.arrive:not([class*="swap-"]) .sc-peek { animation: sc-peek-in .36s ease-out both; }
 @keyframes sc-to-pile { to { transform: translateX(-75%) rotateY(-42deg) rotateZ(-5deg) scale(.9); opacity: 0; } }
 @keyframes sc-lift { to { transform: translateY(-44px) rotateX(-26deg) scale(.92); opacity: 0; } }
 @keyframes sc-rise-1 { to { transform: translateY(-30px) scaleX(1.047); } }

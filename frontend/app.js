@@ -1332,7 +1332,7 @@
       ui.stkArrive = true; rerender();
     }
     if (!s || still) { finish(); return; }
-    ui.stkBusy = true; s.classList.add(cls);
+    ui.stkBusy = true; s.classList.remove('arrive'); s.classList.add(cls);   /* the last settle-in must not win over this swap */
     setTimeout(finish, 460);   /* not a page timer: the stack must change even if a refresh happens meanwhile */
   }
   function stackCards(st) {   /* what is still in the stack, front first (a just-entered card stays a moment) */
