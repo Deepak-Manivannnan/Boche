@@ -1869,6 +1869,7 @@
       }).join('') + '</div>' +
       '<div class="surface mt12" style="padding:4px 16px">' +
       '<div class="kv"><span>Status</span><span><span class="badge ' + st[1] + '">' + st[0] + '</span>' + (d.kind === 'test' ? ' <span class="badge warn">TEST</span>' : '') + '</span></div>' +
+      '<div class="kv"><span>Scratch cards</span><span>' + num(d.cardCount || 0) + '</span></div>' +
       '<div class="kv"><span>Lucky draw numbers</span><span>' + num(d.ticketCount || 0) + '</span></div>' +
       '<div class="kv"><span>Fingerprint</span><span class="adm-fp">' + (d.fingerprint ? esc(d.fingerprint.slice(0, 16)) + '…' : '—') + '</span></div>' +
       '<div class="kv"><span>Seal</span><span>' + (d.sealUrl ? '<a class="link" href="' + esc(d.sealUrl) + '" target="_blank" rel="noopener">On GitHub</a>' : d.fingerprint ? 'Publishing to GitHub…' : '—') + '</span></div>' +

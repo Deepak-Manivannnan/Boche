@@ -41,6 +41,27 @@ def after_round(w, day):
     w.state.test_clock.set(datetime.fromisoformat(day["roundReleasedAt"]) + timedelta(seconds=1))
 
 
+def test_the_admin_sees_entered_scratch_cards_and_their_lucky_numbers(make_client):
+    """Two cards (1 number and 8 numbers); only the 1-number card is entered: 1 card, 1 lucky number."""
+    arun, admin = make_client("arun"), make_client("admin")
+    at(arun, 15, 0)
+    small, big = buy(arun, {"p250": 1, "p1k": 1})["cards"]
+    assert (len(small["numbers"]), len(big["numbers"])) == (1, 8)
+    assert enter(arun, small["id"]).status_code == 200
+    day = admin.get(f"/api/admin/draw-days/{DAY}").json()
+    assert (day["cardCount"], day["ticketCount"]) == (1, 1)
+
+    assert enter(arun, big["id"]).status_code == 200
+    day = admin.get(f"/api/admin/draw-days/{DAY}").json()
+    assert (day["cardCount"], day["ticketCount"]) == (2, 9)
+
+    order = buy(arun, {"p500": 1})  # a refunded card no longer counts
+    enter(arun, order["cards"][0]["id"])
+    assert admin.post(f"/api/admin/orders/{order['id']}/refund").status_code == 200
+    day = admin.get(f"/api/admin/draw-days/{DAY}").json()
+    assert (day["cardCount"], day["ticketCount"]) == (2, 9)
+
+
 def test_an_open_real_day_with_tickets_can_be_skipped(w):
     assert admin_day(w)["canSkip"] is True
 

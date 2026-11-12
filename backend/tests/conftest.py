@@ -102,6 +102,7 @@ def make_client(migrated_url, clean_db):
     yield make
     for client in clients:
         client.close()
+    app.state.db.dispose()  # each test builds its own app: close its pool, or MySQL runs out of connections
 
 
 @pytest.fixture

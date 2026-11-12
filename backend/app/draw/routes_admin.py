@@ -71,12 +71,18 @@ def day_json(db: Session, day: m.DrawDay, now) -> dict:
             .select_from(m.Ticket)
             .where(m.Ticket.draw_day_id == day.id, m.Ticket.status == "issued")
         )
+    cards = db.scalar(  # Scratch cards entered into this day: those whose lucky numbers are counted above
+        sa.select(sa.func.count(sa.distinct(m.Ticket.card_id))).where(
+            m.Ticket.draw_day_id == day.id, m.Ticket.status == "issued"
+        )
+    )
     otp_until = active_expiry(db, day, now) if day.status == "sealed" else None
     return {
         "label": day.label,
         "kind": day.kind,
         "status": day.status,
         "ticketCount": count,
+        "cardCount": cards,
         "closesAt": _iso(day.closes_at),
         "drawNotBefore": _iso(day.draw_not_before),
         "publishNotBefore": _iso(day.publish_not_before),
