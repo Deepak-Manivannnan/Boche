@@ -170,10 +170,13 @@
     el.className = 'rv'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Lucky Draw results reveal');
     el.innerHTML = (reduced ? '' : '<div class="rv-rays" aria-hidden="true"></div>' + sparkles() + matrix()) +
       '<div class="rv-fx" id="rvFx"></div><div class="rv-ladder" id="rvLadder"></div><div class="rv-body" id="rvBody"></div>' +
-      '<button class="rv-snd" type="button" aria-label="Sound">' + (sfx.isOn() ? '♪ On' : '♪ Off') + '</button><button class="rv-skip" type="button">Skip</button>';
+      '<div class="rv-ctl"><button class="rv-snd" type="button" aria-label="Sound">' + (sfx.isOn() ? '♪ On' : '♪ Off') + '</button>' +
+      '<button class="rv-skip" type="button">Skip</button>' +
+      '<button class="rv-x" type="button" aria-label="Close"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button></div>';
     host.appendChild(el); sfx.preload();
     var body = el.querySelector('#rvBody'), fx = el.querySelector('#rvFx'), ladderEl = el.querySelector('#rvLadder');
     el.querySelector('.rv-skip').addEventListener('click', function () { sfx.stop(); finale(); });
+    el.querySelector('.rv-x').addEventListener('click', function () { stop(); });   /* close the reveal at any point */
     el.querySelector('.rv-snd').addEventListener('click', function (e) { e.currentTarget.textContent = sfx.toggle() ? '♪ On' : '♪ Off'; });
 
     function later(fn, ms) { var t = setTimeout(fn, reduced ? Math.min(ms, 60) : ms); timers.push(t); return t; }
