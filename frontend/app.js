@@ -1496,16 +1496,15 @@
   AFTER.draw = function () {
     refreshResults();
     maybeReveal();
-    var el = $('drawCd');
-    if (!el) { timers.push(setInterval(function () { refreshResults(true); }, 60000)); return; }   /* notices a deleted draw */
-    var polled = Date.now();   /* results are published at 8:30 PM IST, or right after an early (Skip) draw */
-    function tick() {
+    /* An Admin can close today's draw early (Skip), run it or delete it at any moment, so while this page is open
+       it checks every 10 s (and at once when the tab is shown again, see below). New winners play the reveal. */
+    timers.push(setInterval(function () { if (!document.hidden) refreshResults(true); }, 10000));
+    var el = $('drawCd'); if (!el) return;
+    function tick() {   /* results are published at 8:30 PM IST, or right after an early (Skip) draw */
       var ms = publishAt(dayKey()) - new Date();
-      if (ms > 0 && Date.now() - polled > 60000) { polled = Date.now(); refreshResults(true); }   /* notices an early close */
       if (ms <= 0) {
         el.textContent = 'Waiting for the draw to run'; el.classList.add('sm');
         var k = $('drawCdK'); if (k) k.textContent = 'Today’s draw';
-        if (Date.now() - polled > 20000) { polled = Date.now(); refreshResults(true); }
         return;
       }
       var h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60;
@@ -2522,6 +2521,8 @@
     e.preventDefault(); row.scrollLeft = to;
   }, { passive: false });
   window.addEventListener('popstate', function () { render(); });
+  /* Back on the Lucky Draw tab after looking elsewhere: fetch the draw's state now rather than at the next check */
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && parse().name === 'draw') refreshResults(true); });
   /* Old links (/#/verify-draw) and /index.html open at their clean URL */
   if (location.hash.indexOf('#/') === 0) history.replaceState(null, '', '/' + location.hash.slice(2));
   else if (location.pathname === '/index.html') history.replaceState(null, '', '/');
