@@ -88,6 +88,10 @@ def create_app(
         response.headers["X-Content-Type-Options"] = "nosniff"
         if request.url.path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"
+        else:
+            # App files: a browser may keep a copy but must check it first (a cheap 304 via ETag), so a deploy
+            # shows on the next load. Otherwise browsers guess a freshness time and keep running old app.js.
+            response.headers["Cache-Control"] = "no-cache"
         return response
 
     @app.get("/api/health")

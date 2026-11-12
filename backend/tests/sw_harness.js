@@ -10,7 +10,8 @@ const self = {
 };
 const caches = { open: async () => ({ addAll: async () => {}, put: async () => {} }), keys: async () => [], match: async () => null, delete: async () => true };
 const fetch = async () => ({ clone() { return this; } });
-new Function("self", "caches", "fetch", fs.readFileSync(path, "utf8"))(self, caches, fetch);
+function Request(input, init) { Object.assign(this, typeof input === "string" ? { url: input } : input, init); }
+new Function("self", "caches", "fetch", "Request", fs.readFileSync(path, "utf8"))(self, caches, fetch, Request);
 
 const result = {};
 for (const [method, url] of [["GET", "/api/me"], ["GET", "/api/public/days/2026-11-10/result.json"], ["GET", "/app.js"], ["GET", "/"], ["POST", "/api/orders"]]) {

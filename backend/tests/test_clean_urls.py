@@ -21,6 +21,13 @@ def test_files_and_api_paths_still_404(make_client):
     assert client.get("/app.js").status_code == 200
 
 
+def test_app_files_are_revalidated_so_a_deploy_shows_on_the_next_load(make_client):
+    client = make_client(None)
+    for path in ("/", "/admin-draw", "/app.js", "/sw.js", "/app.css"):
+        assert client.get(path).headers["cache-control"] == "no-cache", path
+    assert client.get("/api/health").headers["cache-control"] == "no-store"
+
+
 def test_assets_load_from_the_root_on_nested_routes(make_client):
     html = make_client(None).get("/verify-draw/2026-11-10").text
     assert 'src="/app.js"' in html and 'href="/app.css"' in html
