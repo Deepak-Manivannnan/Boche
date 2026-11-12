@@ -633,6 +633,25 @@ textarea.input { height: 84px; padding: 12px 16px; resize: none; }
 .sc-promo { display: flex; gap: 12px; align-items: center; margin-top: 20px; padding: 14px; border-radius: 16px; background: #FFF8E6; border: 1px solid #F1DFAE; color: var(--gold-dd); text-align: left; }
 .sc-promo b { display: block; font-size: 15px; }
 .sc-promo span { font-size: 13px; color: var(--ink-2); }
+/* Lucky Draw page: two card piles (Unscratched / Scratched) instead of a row per card */
+.pile-btn { padding: 12px 14px; }
+.pile-btn > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pile-btn b { font-size: 14px; font-weight: 700; color: var(--ink); }
+.pile-btn small { font-size: 12px; color: var(--gold-dd); }
+.pile-n { flex: none; min-width: 26px; height: 26px; padding: 0 8px; border-radius: 999px; background: var(--metal); color: var(--ink); font: 700 12.5px/26px var(--font); font-style: normal; text-align: center; box-shadow: 0 2px 6px rgba(80, 56, 16, .2); }
+/* Scratch stack: the cards behind peek out under the front card; tap one to bring it forward */
+.sc-stack { position: relative; }
+.sc-stack.s1 { padding-bottom: 30px; }
+.sc-stack.s2 { padding-bottom: 42px; }
+.sc-stack .scard { z-index: 3; }
+.sc-peek { position: absolute; top: 30px; bottom: 0; display: flex; align-items: flex-end; justify-content: center; padding: 0 0 7px; border-radius: 22px; background: #fff; border: 1.5px dashed var(--gold-l); box-shadow: 0 10px 22px rgba(80, 56, 16, .12); cursor: pointer; transition: transform .15s; }
+.sc-peek.gold { border: 0; background: linear-gradient(135deg, #8C6420 0%, #D9B45A 35%, #F5E2A8 50%, #C9A04A 70%, #8C6420 100%); }
+.sc-peek.p1 { left: 8px; right: 8px; z-index: 2; }
+.sc-stack.s2 .sc-peek.p1 { bottom: 12px; }
+.sc-peek.p2 { left: 18px; right: 18px; top: 42px; z-index: 1; opacity: .75; }
+.sc-peek:active { transform: translateY(2px); }
+.sc-peek span { display: inline-flex; align-items: center; gap: 2px; font-size: 11.5px; font-weight: 600; color: var(--gold-dd); }
+.sc-peek.gold span { color: rgba(46, 33, 8, .85); }
 .draw-hero { position: relative; border-radius: 24px; padding: 18px; background: radial-gradient(120% 90% at 100% 0%, #7A5222 0%, rgba(122,82,34,0) 60%), linear-gradient(150deg, #2A1C0E 0%, #4A3115 100%); color: #FBF3DF; box-shadow: 0 12px 28px rgba(60, 40, 10, .2); }
 .draw-hero .hm-eyebrow { color: #F1D58C; }
 .dh-top { font-family: var(--serif); font-size: 38px; font-weight: 700; color: #F1D58C; margin-top: 8px; line-height: 1.1; }

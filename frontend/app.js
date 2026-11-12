@@ -1213,7 +1213,7 @@
       (function (open) {
         var n = (o.cards || []).length, nos = (o.cards || []).reduce(function (t, c) { return t + c.nos.length; }, 0);
         return open ? '<div class="sc-promo">' + ic('gift', 22) + '<div><b>You’ve won ' + (n > 1 ? n + ' scratch cards' : 'a scratch card') + '!</b><span>' + numsLabel(nos) + ' for today’s ' + inr(BC_DRAW.prizes[0].amount) + ' Lucky Draw.</span></div></div>' +
-          '<button class="btn btn-gold mt16" data-go="scratch/' + open.id + '">' + ic('sparkle', 18) + 'Scratch now</button><button class="btn-text" data-go="home">Back to Home</button></div>'
+          '<button class="btn btn-gold mt16" data-go="scratch/order-' + o.id + '">' + ic('sparkle', 18) + 'Scratch now</button><button class="btn-text" data-go="home">Back to Home</button></div>'
           : '<button class="btn btn-gold mt24" data-go="home">' + ic('home', 18) + 'Back to Home</button></div>';
       })((o.cards || []).filter(function (c) { return !c.scratched; })[0]);
   };
@@ -1300,20 +1300,37 @@
   function nextDrawKey() { return new Date().getHours() < BC_DRAW.drawHour ? dayKey() : dayShift(dayKey(), 1); }
   function numsLabel(n) { return n === 1 ? '1 lucky number' : n + ' lucky numbers'; }
 
-  /* What sits under the card: hint → (once partly scratched) Enter button → entered / next card */
-  function scratchBody(x) {
-    var c = x.c, cards = x.o.cards, i = cards.indexOf(c), next = cards.slice(i + 1).concat(cards.slice(0, i)).filter(function (k) { return !k.submitted; })[0];
-    return !c.scratched
-      ? '<p class="sc-hint">' + ic('sparkle', 15) + 'Scratch to reveal your ' + (c.nos.length > 1 ? c.nos.length + ' numbers' : 'lucky number') + '</p>'
-      : !c.submitted
-        ? '<button class="btn btn-gold mt16" data-act="drawSubmit" data-id="' + c.id + '">' + ic('gift', 18) + 'Enter ' + esc(dayLabel(nextDrawKey()).toLowerCase()) + '’s Lucky Draw</button>' +
-          '<p class="fine center">' + (c.nos.length > 1 ? 'All ' + c.nos.length + ' numbers go in · ' : '') + 'Draw at ' + drawTimeLabel() + '</p>'
-        : '<div class="sc-luck"><span class="sl-ic">' + ic('sparkle', 22) + '</span>' +
-            '<h2>Good luck, ' + esc(BC_MEMBER.firstName) + '!</h2>' +
-            '<p>' + (c.nos.length > 1 ? 'All ' + c.nos.length + ' numbers are' : 'Your number is') + ' in <b>' + esc(dayLabel(c.drawDate).toLowerCase()) + '’s Lucky Draw</b>.</p>' +
-            '<div class="sl-sms">' + ic('phone', 15) + '<span>Results at ' + drawTimeLabel() + '. If you win, we’ll SMS <b class="nowrap">+91 ' + esc(BC_MEMBER.mobile) + '</b></span></div></div>' +
-          (next ? '<button class="btn btn-gold mt16" data-go="scratch/' + next.id + '">Next card (' + (cards.indexOf(next) + 1) + ' of ' + cards.length + ')</button>'
-            : '<button class="btn btn-gold mt16" data-go="draw">See Lucky Draw</button>');
+  /* ----- Scratch cards as a stack. Opened from the Lucky Draw page (scratch/unscratched, scratch/scratched), right
+     after buying (scratch/order-<order id>: that order's cards), or for one card (scratch/<card id>: its pile, with
+     that card in front). The front card is scratched and entered; the cards behind peek out underneath. Tapping the
+     card behind brings it forward: a scratched front card then waits under Scratched cards, an unscratched one goes
+     to the back. Entered cards leave the stack. ✕ goes back to the Lucky Draw page. ----- */
+  function stackOf(arg) {
+    if (ui.stk && ui.stk.key === arg && !ui.stkFresh) return ui.stk;
+    ui.stkFresh = false;
+    var open = allCards().filter(function (x) { return !x.c.submitted; }), mode = 'unscratched', list;
+    if (arg === 'scratched') { mode = 'scratched'; list = open.filter(function (x) { return x.c.scratched; }); }
+    else if (arg === 'unscratched') list = open.filter(function (x) { return !x.c.scratched; });
+    else if (arg.indexOf('order-') === 0) { mode = 'order'; list = open.filter(function (x) { return !x.c.scratched && x.o.id === arg.slice(6); }); }
+    else {
+      var one = cardById(arg); if (!one || one.c.submitted) return null;
+      mode = one.c.scratched ? 'scratched' : 'unscratched';
+      list = [one].concat(open.filter(function (x) { return x.c.scratched === one.c.scratched && x.c.id !== one.c.id; }));
+    }
+    return (ui.stk = { key: arg, mode: mode, ids: list.map(function (x) { return x.c.id; }), gone: {} });
+  }
+  function stackCards(st) {   /* what is still in the stack, front first (a just-entered card stays a moment) */
+    return st.ids.map(cardById).filter(function (x) { return x && !st.gone[x.c.id] && (!x.c.submitted || x.c.id === ui.stkJust); });
+  }
+  /* What sits under the front card: scratch hint → Enter button → entered */
+  function stackBody(x, st, more) {
+    var c = x.c;
+    if (c.submitted) return '<div class="sc-in">' + ic('check', 18) + '<span>' + (c.nos.length > 1 ? 'All ' + c.nos.length + ' numbers are' : 'Your number is') + ' in ' + esc(dayLabel(c.drawDate).toLowerCase()) + '’s Lucky Draw. Good luck!</span></div>';
+    if (!c.scratched) return '<p class="sc-hint">' + ic('sparkle', 15) + 'Scratch to reveal your ' + (c.nos.length > 1 ? c.nos.length + ' numbers' : 'lucky number') + '</p>' +
+      (more ? '<p class="fine center">Not now? Tap the card behind for the next one.</p>' : '');
+    return '<button class="btn btn-gold mt16" data-act="drawSubmit" data-id="' + c.id + '">' + ic('gift', 18) + 'Enter ' + esc(dayLabel(nextDrawKey()).toLowerCase()) + '’s Lucky Draw</button>' +
+      '<p class="fine center">' + (c.nos.length > 1 ? 'All ' + c.nos.length + ' numbers go in · ' : '') + 'Draw at ' + drawTimeLabel() + '</p>' +
+      (more ? '<p class="fine center">' + (st.mode === 'scratched' ? 'Tap the card behind for the next one.' : 'Enter later? Tap the card behind. This one waits under Scratched cards.') + '</p>' : '');
   }
   /* Welcome splash after a verified venue check-in: access granted, with a short fanfare (Web Audio) */
   function playWelcome() {
@@ -1384,22 +1401,32 @@
     for (var i = 0; i < 28; i++) h += '<i style="left:' + Math.round(Math.random() * 100) + '%;background:' + cols[i % cols.length] + ';animation-delay:' + (Math.random() * .5).toFixed(2) + 's;animation-duration:' + (1.6 + Math.random() * 1.2).toFixed(2) + 's;transform:rotate(' + Math.round(Math.random() * 360) + 'deg)"></i>';
     return '<div class="confetti" aria-hidden="true">' + h + '</div>';
   }
-  SCREENS.scratch = function (cid) {
-    var x = cardById(cid); if (!x) return SCREENS.draw();
-    var c = x.c, n = c.nos.length, cards = x.o.cards;
-    return '<div class="flow">' + topbar('Lucky Draw', 'home') + '<div class="pad">' +
-      '<p class="sc-lead">' + (cards.length > 1 ? '<b>Card ' + (cards.indexOf(c) + 1) + ' of ' + cards.length + '</b> · ' : '') + 'Win up to <b>' + inr(BC_DRAW.prizes[0].amount) + '</b> today</p>' +
+  SCREENS.scratch = function (arg) {
+    var st = stackOf(arg); if (!st) return SCREENS.draw();
+    var vis = stackCards(st), title = { scratched: 'Scratched cards', unscratched: 'Unscratched cards', order: 'Your scratch cards' }[st.mode];
+    var head = '<div class="flow">' + topbar(title, null, '<button class="iconbtn" data-go="draw" aria-label="Close">' + ic('x', 20) + '</button>') + '<div class="pad">';
+    ui.stkFront = vis.length ? vis[0].c.id : null;
+    if (!vis.length) return head + '<div class="sc-luck mt16"><span class="sl-ic">' + ic('sparkle', 22) + '</span><h2>All done</h2><p>' +
+      (st.mode === 'scratched' ? 'Every scratched card is in the draw.' : 'No cards left to scratch.') + '</p></div>' +
+      '<button class="btn btn-gold mt16" data-go="draw">See Lucky Draw</button></div></div>';
+    var x = vis[0], c = x.c, n = c.nos.length, behind = vis.slice(1, 3);
+    var peeks = behind.map(function (b, k) {
+      return '<button class="sc-peek p' + (k + 1) + (b.c.scratched ? '' : ' gold') + '" data-act="stkNext" aria-label="Show the next card">' +
+        (k === 0 ? '<span>Next card · ' + numsLabel(b.c.nos.length) + ic('chev', 13) + '</span>' : '') + '</button>';
+    }).reverse().join('');
+    return head +
+      '<p class="sc-lead"><b>' + vis.length + (vis.length > 1 ? ' cards' : ' card') + '</b> ' + (st.mode === 'scratched' ? 'to enter' : 'to scratch') + ' · Win up to <b>' + inr(BC_DRAW.prizes[0].amount) + '</b> today</p>' +
+      '<div class="sc-stack s' + behind.length + '">' + peeks +
       '<div class="scard n' + (n === 1 ? 1 : n <= 3 ? 3 : 12) + '" id="scard"><div class="sc-face"><span class="sc-k">' + (n === 1 ? 'Your lucky number' : 'Your ' + n + ' lucky numbers') + '</span>' +
         '<div class="sc-nos">' + c.nos.map(function (no) { return '<span class="sc-no">' + esc(no) + '</span>'; }).join('') + '</div>' +
         '<span class="sc-s">' + (c.pack ? esc(c.pack) + ' pack · ' : '') + esc(x.o.date) + '</span></div>' +
         (c.submitted ? '<span class="sc-stamp">' + ic('check', 13) + 'Entered</span>' : '') +
-        (c.scratched ? '' : '<canvas id="scCanvas" aria-hidden="true"></canvas><button class="sc-reveal" data-act="scratchReveal" data-id="' + c.id + '">Reveal without scratching</button>') + '</div>' +
-      (ui.justEntered === c.id ? confetti() : '') +
-      '<div id="scBody">' + scratchBody(x) + '</div></div>' +
-      (c.submitted ? '' : '<div class="sticky-cta"><button class="btn-text" data-go="draw">Later</button></div>') + '</div>';
+        (c.scratched ? '' : '<canvas id="scCanvas" aria-hidden="true"></canvas><button class="sc-reveal" data-act="scratchReveal" data-id="' + c.id + '">Reveal without scratching</button>') + '</div></div>' +
+      (ui.stkJust === c.id ? confetti() : '') +
+      '<div id="scBody">' + stackBody(x, st, behind.length) + '</div></div></div>';
   };
-  AFTER.scratch = function (id) {
-    var cv = $('scCanvas'); if (!cv) return;
+  AFTER.scratch = function () {
+    var id = ui.stkFront, cv = $('scCanvas'); if (!cv || !id) return;
     var box = $('scard').getBoundingClientRect(), dpr = window.devicePixelRatio || 1, ctx = cv.getContext('2d'), w = box.width, h = box.height;
     cv.width = w * dpr; cv.height = h * dpr; ctx.scale(dpr, dpr);
     var g = ctx.createLinearGradient(0, 0, w, h);
@@ -1425,7 +1452,7 @@
       if (!seen && clear / n > 0.12) {
         seen = true;
         var x = cardById(id); if (!x.c.scratched) { x.c.scratched = true; markScratched(id); }
-        $('scBody').innerHTML = scratchBody(x);
+        $('scBody').innerHTML = stackBody(x, ui.stk, stackCards(ui.stk).length > 1);
         var rv = document.querySelector('.sc-reveal'); if (rv) rv.remove();
       }
       if (clear / n > 0.55) { finished = true; cv.classList.add('gone'); setTimeout(function () { ACTIONS.scratchReveal({ dataset: { id: id } }); }, 450); }
@@ -1480,9 +1507,14 @@
       '<div class="draw-hero"><span class="hm-eyebrow">' + ic('gift', 14) + 'Every day at ' + drawTimeLabel() + '</span>' +
         '<div class="dh-top">' + inr(BC_DRAW.prizes[0].amount) + '</div><div class="dh-s">1st prize · ' + drawWinnerCount() + ' winners daily</div>' +
         '<div class="dh-prizes">' + BC_DRAW.prizes.slice(1).map(function (p) { return '<span>' + (p.count > 1 ? p.count + ' × ' : '') + inr(p.amount) + '</span>'; }).join('') + '</div></div>' +
-      (pending.length ? pending.map(function (c) {
-        return '<button class="alert alert-btn" data-go="scratch/' + c.id + '">' + ic('sparkle', 18) + '<span>' + (c.scratched ? 'Enter your ' + numsLabel(c.nos.length) : 'Scratch card to open · ' + numsLabel(c.nos.length)) + '</span>' + ic('chev', 16) + '</button>';
-      }).join('') : '') +
+      /* Two piles instead of one row per card: cards still to scratch, and scratched cards still to enter */
+      [[pending.filter(function (c) { return !c.scratched; }), 'unscratched', 'Unscratched cards', 'to reveal'],
+       [pending.filter(function (c) { return c.scratched; }), 'scratched', 'Scratched cards', 'ready to enter']].map(function (p) {
+        if (!p[0].length) return '';
+        var nos = p[0].reduce(function (t, c) { return t + c.nos.length; }, 0);
+        return '<button class="alert alert-btn pile-btn" data-go="scratch/' + p[1] + '">' + ic(p[1] === 'unscratched' ? 'gift' : 'sparkle', 18) +
+          '<span><b>' + p[2] + '</b><small>' + numsLabel(nos) + ' ' + p[3] + '</small></span><em class="pile-n">' + p[0].length + '</em>' + ic('chev', 16) + '</button>';
+      }).join('') +
       '<div class="sec-h" style="padding:0;margin-top:22px"><h3>Today · ' + esc(new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })) + '</h3></div>' +
       (res ? wonCard(res) + winners(res) + verifyLink(today)
         : '<div class="surface draw-wait"><div class="dw-k" id="drawCdK">Results in</div><div class="dw-v" id="drawCd"></div>' +
@@ -2246,6 +2278,15 @@
       ui.tea.qty = teaBlankBag(); ui.pay = null;
       go('tea-done/' + mine.id);
     },
+    /* Tap the card behind: it comes forward. A scratched front card waits under Scratched cards (it leaves this
+       stack, unless this is the Scratched pile); an unscratched one goes to the back of the stack. */
+    stkNext: function () {
+      var st = ui.stk, vis = st ? stackCards(st) : []; if (vis.length < 2 || ui.stkJust) return;
+      var f = vis[0].c;
+      if (f.scratched && st.mode !== 'scratched') { st.gone[f.id] = true; toast('Saved under Scratched cards'); }
+      else st.ids = st.ids.filter(function (i) { return i !== f.id; }).concat(f.id);
+      rerender();
+    },
     scratchReveal: function (el) { var x = cardById(el.dataset.id); if (!x || x.c.scratched) return; x.c.scratched = true; markScratched(x.c.id); rerender(); },
     drawSubmit: function (el) {
       var x = cardById(el.dataset.id); if (!x || x.c.submitted) return;
@@ -2259,7 +2300,15 @@
       Promise.all([entry, shown]).then(function (r) {
         ui.sheetLock = false; closeSheet();
         var key = r[0].drawDay;
-        c.submitted = true; c.drawDate = key; ui.justEntered = c.id; rerender(); ui.justEntered = null; playChime();
+        c.submitted = true; c.drawDate = key; playChime();
+        /* The stack shows the card as entered for a moment, then the next card comes forward (or, if none is
+           left, back to the Lucky Draw page) */
+        ui.stkJust = c.id; rerender();
+        timers.push(setTimeout(function () {
+          ui.stkJust = null;
+          if (parse().name !== 'scratch') return;
+          if (ui.stk && !stackCards(ui.stk).length) { toast('All cards entered · good luck!'); go('draw'); } else rerender();
+        }, 1400));
       }, function (e) {
         shown.then(function () {
           ui.sheetLock = false; closeSheet();
@@ -2444,7 +2493,7 @@
     if (!keepScroll) trackNav();
     var r = resolve(parse()), scr = $('screen'), top = scr.scrollTop;
     if (REVEAL_STOP && r.name !== 'draw' && r.name !== 'admin-draw') REVEAL_STOP();
-    if (!keepScroll) { clearTimers(); closeSheet(true); ui.pageMenu = false; ui.teaSeen = false; ui.revealDue = r.name === 'draw'; }
+    if (!keepScroll) { clearTimers(); closeSheet(true); ui.pageMenu = false; ui.teaSeen = false; ui.revealDue = r.name === 'draw'; ui.stkFresh = true; }
     $('device').classList.toggle('has-tabs', !!TABS[r.name]);
     scr.innerHTML = SCREENS[r.name](r.arg);
     scr.scrollTop = keepScroll ? top : 0;
