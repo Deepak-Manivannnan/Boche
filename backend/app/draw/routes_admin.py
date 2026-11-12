@@ -6,7 +6,7 @@ recorded in the run log and stays visible in the Seal's GitHub history."""
 
 import logging
 import threading
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Annotated
 
 import sqlalchemy as sa
@@ -14,10 +14,14 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.core.clock import ist_date, ist_time
 from app.core.deps import get_db, require_admin
 from app.db import models as m
 from app.draw.drand import round_released_at
 from app.draw.drawdays import (
+    DRAW_FROM,
+    ENTRIES_CLOSE,
+    PUBLISH_AT,
     DeleteRefused,
     ResetRefused,
     SkipRefused,
@@ -25,6 +29,7 @@ from app.draw.drawdays import (
     can_reset,
     can_skip,
     delete_draw,
+    entry_day,
     reset_entries,
     skip_to_draw,
 )
@@ -128,7 +133,41 @@ def list_days(request: Request, db: Db) -> list[dict]:
     days = db.scalars(
         sa.select(m.DrawDay).order_by(m.DrawDay.day.desc(), m.DrawDay.id.desc()).limit(14)
     ).all()
-    return [day_json(db, d, now) for d in days]
+    listed = [day_json(db, d, now) for d in days]
+    today = ist_date(now)
+    if entry_day(now) == today and not any(d.kind == "real" and d.day == today for d in days):
+        listed.insert(0, not_started_json(today))
+    return listed
+
+
+def not_started_json(day: date) -> dict:
+    """Today's real Draw day before its first card is entered: shown taking entries with 0 tickets. It is
+    saved when the first card goes in (entry_draw_day), so a day nobody enters is never sealed."""
+    return {
+        "label": day.isoformat(),
+        "kind": "real",
+        "status": "open",
+        "ticketCount": 0,
+        "cardCount": 0,
+        "closesAt": _iso(ist_time(day, *ENTRIES_CLOSE)),
+        "drawNotBefore": _iso(ist_time(day, *DRAW_FROM)),
+        "publishNotBefore": _iso(ist_time(day, *PUBLISH_AT)),
+        "sealedAt": None,
+        "fingerprint": None,
+        "drandRound": None,
+        "roundReleasedAt": None,
+        "sealUrl": None,
+        "sealPublished": False,
+        "canRequestOtp": False,
+        "canSkip": False,
+        "canDelete": False,
+        "canReset": False,
+        "otpExpiresAt": None,
+        "drawnAt": None,
+        "randomness": None,
+        "winners": None,
+        "seeding": None,
+    }
 
 
 @router.get("/draw-days/{label}")

@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 import sqlalchemy as sa
 from draw_support import drand_value, sealed_day
-from test_entries_api import at
+from test_entries_api import at, enter, first_card
 
 from app.db import models as m
 from app.draw.drawrun import verify_chain
@@ -262,3 +262,30 @@ def test_the_draw_days_list_shows_status_and_winners(w):
     run(w, w.state.otp_sender.code)
     day = w.admin.get("/api/admin/draw-days").json()[0]
     assert day["status"] == "drawn" and len(day["winners"]) == 10 and day["canRequestOtp"] is False
+
+
+# ---------------------------------------------------------------- today's draw before anyone has entered
+
+
+def test_with_no_entries_yet_the_admin_sees_todays_draw_at_zero(make_client, db_engine):
+    admin = make_client("admin")  # 12:00 IST, an empty database: no Draw day has been made yet
+    days = admin.get("/api/admin/draw-days").json()
+    row = days[0]
+    assert len(days) == 1 and (row["label"], row["kind"], row["status"]) == (DAY, "real", "open")
+    assert (row["ticketCount"], row["cardCount"]) == (0, 0)
+    assert (row["canSkip"], row["canReset"], row["canDelete"], row["canRequestOtp"]) == (False,) * 4
+    assert row["closesAt"] == "2026-11-10T14:30:00+00:00"  # 8:00 PM IST
+    with db_engine.connect() as conn:  # only shown: saved when the first card goes in, so never sealed empty
+        assert conn.scalar(sa.select(sa.func.count()).select_from(m.DrawDay)) == 0
+
+    arun = make_client("arun")
+    assert enter(arun, first_card(arun)["id"]).status_code == 200  # a 500 g pack: 3 lucky numbers
+    days = admin.get("/api/admin/draw-days").json()
+    assert [(d["label"], d["ticketCount"], d["cardCount"]) for d in days] == [(DAY, 3, 1)]
+    assert set(days[0]) == set(row)  # the same fields as before it was saved
+
+
+def test_after_eight_pm_no_empty_day_is_shown(make_client):
+    admin = make_client("admin")
+    at(admin, 20, 0)
+    assert admin.get("/api/admin/draw-days").json() == []
