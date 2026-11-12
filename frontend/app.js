@@ -343,7 +343,9 @@
     });
   }
 
-  function wireOtp(onFull, wait) {
+  /* Code boxes. By default the last digit submits; with manual set, filling them only enables the button
+     (customer sign-in: the customer taps Verify & continue, or presses Enter). */
+  function wireOtp(onFull, wait, manual) {
     var wrap = $('otp'), ins = wrap.querySelectorAll('input'), btn = wrap.parentNode.querySelector('[data-otp-btn]');
     function code() { return Array.prototype.map.call(ins, function (x) { return x.value; }).join(''); }
     Array.prototype.forEach.call(ins, function (inp, i) {
@@ -353,9 +355,12 @@
         else { inp.value = v; if (v && ins[i + 1]) ins[i + 1].focus(); }
         wrap.classList.remove('bad'); $('otpErr').textContent = '';
         btn.disabled = code().length !== ins.length;
-        if (code().length === ins.length) onFull(code());
+        if (code().length === ins.length && !manual) onFull(code());
       });
-      inp.addEventListener('keydown', function (e) { if (e.key === 'Backspace' && !inp.value && ins[i - 1]) ins[i - 1].focus(); });
+      inp.addEventListener('keydown', function (e) {
+        if (e.key === 'Backspace' && !inp.value && ins[i - 1]) ins[i - 1].focus();
+        if (e.key === 'Enter' && manual && code().length === ins.length) onFull(code());
+      });
     });
     ins[0].focus();
     var left = wait || 30;
@@ -413,7 +418,9 @@
   };
   AFTER.mobile = function () {
     ui.auth = ui.auth || { via: 'mobile' };
-    if (ui.auth.sent) wireOtp(function () { ACTIONS.verifyOtp(); }, 60);   /* the server sends at most one code a minute */
+    /* The customer submits the code with Verify & continue; nothing happens on the last digit alone.
+       Resend waits 60 s: the server sends at most one code a minute. */
+    if (ui.auth.sent) wireOtp(function () { ACTIONS.verifyOtp(); }, 60, true);
     else wireMobile('mobile', 'mobGo', 'mobErr', function () { ACTIONS.sendCode(); });
     if (ui.auth.err) { $('mobErr').textContent = ui.auth.err; ui.auth.err = ''; }   /* e.g. "already registered" */
   };
