@@ -59,7 +59,8 @@
     BC_MEMBER.name = p ? p.name : BASE.name; BC_MEMBER.firstName = p ? p.name.split(' ')[0] : BASE.firstName;
     BC_MEMBER.email = p ? p.email : BASE.email; BC_MEMBER.mobile = p && p.mobile ? p.mobile : BASE.mobile;
     /* Signed in: everything comes from this account on the server (name, email if Google is connected, the
-       verified mobile). Accounts made before mobile sign-in have no number and show the prototype's fixed one. */
+       verified mobile). Accounts made before mobile sign-in have no number: the profile says so; prototype screens
+       that still need one show the demo number. */
     if (ME) { BC_MEMBER.name = ME.name; BC_MEMBER.firstName = ME.firstName; BC_MEMBER.email = ME.email || ''; BC_MEMBER.mobile = ME.mobile || BASE.mobile; }
   }
   applyProfile();
@@ -149,6 +150,7 @@
     check: '<polyline points="20 6 9 17 4 12"/>',
     shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/>',
     phone: '<rect x="5" y="2" width="14" height="20" rx="2.5"/><line x1="12" y1="18" x2="12.01" y2="18"/>',
+    mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
     crown: '<path d="M3 18h18M4 8l4 4 4-7 4 7 4-4-2 10H6z"/>',
     tag: '<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
     receipt: '<path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 1 .7V2l-1 .7-3-2-3 2-3-2-3 2-3-2z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/>',
@@ -1899,13 +1901,12 @@
       '<button class="prof-name-btn" data-act="editName" aria-label="Edit your name"><span class="prof-name">' + esc(BC_MEMBER.name) + '</span><span class="prof-pen">' + ic('pen', 15) + '</span></button>' +
       '<div class="li-s">' + esc(BC_MEMBER.id) + '</div><span class="badge mt8">' + ic('crown', 12) + esc(t.name) + ' member</span></div></div>' +
       '<div class="pad"><div class="list">' + row('receipt', 'Activity', 'Points, bills and visits', 'data-go="activity"') + '</div><div class="field-l">Account</div><div class="list">' +
-      (ME && ME.mobile
-        ? row('phone', '+91 ' + esc(fmtMobile(ME.mobile)), 'Mobile · verified by SMS code', 'disabled', '<span class="badge ok">Verified</span>')
-        : row('phone', '+91 ' + esc(BC_MEMBER.mobile), 'Mobile', 'disabled', '')) +
+      /* Mobile and email read the same way: the value on top, what it is underneath; nothing else */
+      row('phone', ME && ME.mobile ? '+91 ' + esc(fmtMobile(ME.mobile)) : 'No mobile number', 'Mobile', 'disabled', '') +
       row('shield', 'Trusted phones', myDevices().length + (myDevices().length === 1 ? ' phone' : ' phones') + ' · new phones need email check', 'data-act="devices"') +
-      (ME && ME.hasGoogle
-        ? row('doc', esc(ME.email || BC_MEMBER.email), 'Email · your Google account (you can sign in with it)', 'disabled', '<span class="badge ok">Connected</span>')
-        : row('doc', 'Connect with Google', 'Add your email and sign in with Google too', 'data-act="connectGoogle"')) +
+      (ME && ME.hasGoogle && ME.email
+        ? row('mail', '<span class="li-email">' + esc(ME.email) + '</span>', 'Email', 'disabled', '')
+        : row('mail', 'Connect with Google account', 'Email', 'data-act="connectGoogle"')) +
       (function (l, def) {
         return row('pin', 'Delivery addresses', l.length ? (l.length > 1 ? l.length + ' saved · ' : '') + esc(def.label || 'Home') + ': ' + esc(addrLine(def)) : 'Add an address for Boche Tea and other deliveries', 'data-go="addresses"');
       })(addrList(), addrDefault()) +
@@ -2188,7 +2189,7 @@
         function (e) { var el = $('nmErr'); if (el) el.textContent = e.status === 422 ? 'Enter your name' : e.message || 'Could not save the name'; });
     },
     connectGoogle: function () {
-      openSheet('<h3>Connect with Google</h3><p class="lead">Choose the Google account to connect. After that you can sign in with Google as well as your mobile number.</p>' +
+      openSheet('<h3>Connect with Google account</h3><p class="lead">Choose the Google account to add. A Google account already linked to another Boche account can’t be added. Once added, you can sign in with it or with your mobile number.</p>' +
         '<div class="gsi-slot mt16" id="gsiConnect"><span class="mini-spin" aria-label="Loading Google sign-in"></span></div><div class="err-text" id="gcErr"></div>');
       mountGoogleButton('gsiConnect', 'gcErr', function (resp) {
         BCAPI.post('/me/google', { credential: resp.credential }).then(function (u) { ME = u; applyProfile(); closeSheet(); rerender(); toast('Google account connected'); },
