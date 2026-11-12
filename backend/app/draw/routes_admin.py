@@ -17,7 +17,17 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_db, require_admin
 from app.db import models as m
 from app.draw.drand import round_released_at
-from app.draw.drawdays import DeleteRefused, SkipRefused, can_delete, can_skip, delete_draw, skip_to_draw
+from app.draw.drawdays import (
+    DeleteRefused,
+    ResetRefused,
+    SkipRefused,
+    can_delete,
+    can_reset,
+    can_skip,
+    delete_draw,
+    reset_entries,
+    skip_to_draw,
+)
 from app.draw.drawrun import DrawRefused, run_draw
 from app.draw.lifecycle import publish_results, publish_seals
 from app.draw.otp import OtpRefused, active_expiry, request_otp
@@ -95,6 +105,7 @@ def day_json(db: Session, day: m.DrawDay, now) -> dict:
         "canRequestOtp": day.status == "sealed" and now >= day.draw_not_before,
         "canSkip": can_skip(db, day, now),
         "canDelete": can_delete(day, now),
+        "canReset": can_reset(db, day, now),
         "otpExpiresAt": _iso(otp_until),
         "drawnAt": _iso(day.drawn_at),
         "randomness": day.result.randomness if day.result else None,
@@ -138,6 +149,19 @@ def skip_wait(label: Label, request: Request, db: Db) -> dict:
     log.warning("entries for %s closed early (Skip) by admin user %s", label, admin.id)
     publish_seals(db, state.seal_publisher)
     db.refresh(day)
+    return day_json(db, day, now)
+
+
+@router.post("/draw-days/{label}/reset-entries")
+def reset_day_entries(label: Label, request: Request, db: Db) -> dict:
+    """Give every entered card back to its owner while the day still takes entries (for repeated demos)."""
+    admin = require_admin(request, db)
+    now = request.app.state.clock.now()
+    try:
+        day = reset_entries(db, label, admin, now)
+    except ResetRefused as e:
+        raise HTTPException(status_code=e.status, detail=e.detail) from e
+    log.warning("entries for %s reset by admin user %s", label, admin.id)
     return day_json(db, day, now)
 
 

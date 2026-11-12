@@ -1990,7 +1990,13 @@
         ? '<div class="rule-note mt16">' + ic('shield', 16) + '<span>Close today’s entries now? The ' + num(d.ticketCount || 0) + ' tickets entered so far are sealed and drawn; cards entered after this go into tomorrow’s draw. This cannot be undone.</span></div>' +
           '<div class="btn-row mt12"><button class="btn btn-line" data-act="admSkipCancel">Cancel</button><button class="btn btn-gold" data-act="admSkip">Yes, close and draw now</button></div>'
         : '<button class="btn btn-gold mt16" data-act="admSkipArm">' + ic('sparkle', 16) + 'Skip the wait · draw now</button>' +
-          '<p class="fine center">Seals today’s list now instead of at 8:00 PM. The founder’s OTP can be sent about 30 s later, and results go public as soon as the draw runs.</p>');
+          '<p class="fine center">Seals today’s list now instead of at 8:00 PM. The founder’s OTP can be sent about 30 s later, and results go public as soon as the draw runs.</p>') +
+      /* Reset entries (demos): every entered card goes back to its owner to be entered again; first tap only asks */
+      (!d.canReset ? '' : A.resetArm === d.label
+        ? '<div class="rule-note mt16">' + ic('shield', 16) + '<span>Reset this draw’s entries? The ' + num(d.cardCount || 0) + ' scratch cards (' + num(d.ticketCount || 0) + ' lucky numbers) go back to their owners, ready to enter again. Nothing is drawn or deleted.</span></div>' +
+          '<div class="btn-row mt12"><button class="btn btn-line" data-act="admResetCancel">Cancel</button><button class="btn btn-gold" data-act="admReset">Yes, reset entries</button></div>'
+        : '<button class="btn btn-line mt16" data-act="admResetArm">' + ic('back', 16) + 'Reset entries</button>' +
+          '<p class="fine center">Gives every entered card back to its owner so it can be entered again.</p>');
     else if (d.status === 'sealed' && !d.canRequestOtp) body = '<div class="rule-note mt16">' + ic('clock', 16) + '<span>Waiting for drand round ' + d.drandRound + ', released at ' + istTime(d.roundReleasedAt, true) + '. The founder’s OTP can be sent after that.</span></div>';
     else if (d.status === 'sealed' && !d.otpExpiresAt) body = '<button class="btn btn-gold mt16" data-act="admSendOtp">' + ic('phone', 18) + 'Send OTP to founder</button>' +
       '<p class="fine center">The founder gets a 4-digit code by SMS. It runs this draw only, on the sealed list and the drand round above.</p>';
@@ -2206,7 +2212,17 @@
     },
     staffOutlet: function (el) { SES.outlet = el.dataset.id; saveSes(); rerender(); },
     staffLogout: function () { SES.staffId = null; saveSes(); ui.staffMobile = ''; go('welcome'); },
-    admPick: function (el) { ui.adm.sel = el.dataset.id; ui.adm.skipArm = ui.adm.delArm = null; rerender(); },
+    admPick: function (el) { ui.adm.sel = el.dataset.id; ui.adm.skipArm = ui.adm.delArm = ui.adm.resetArm = null; rerender(); },
+    admResetArm: function () { var d = admDay(); if (d && d.canReset) { ui.adm.resetArm = d.label; ui.adm.skipArm = null; rerender(); } },
+    admResetCancel: function () { ui.adm.resetArm = null; rerender(); },
+    admReset: function () {
+      var d = admDay(); if (!d || ui.adm.busy || ui.adm.resetArm !== d.label) return; ui.adm.busy = true;
+      BCAPI.post('/admin/draw-days/' + encodeURIComponent(d.label) + '/reset-entries').then(function (day) {
+        ui.adm.busy = false; ui.adm.resetArm = null;
+        ui.adm.days = ui.adm.days.map(function (x) { return x.label === day.label ? day : x; });
+        rerender(); toast('Entries reset · cards are back with their owners');
+      }, function (e) { ui.adm.busy = false; ui.adm.resetArm = null; toast(e.message || 'Could not reset the entries'); admLoad().then(rerender); });
+    },
     /* Delete today's completed draw: the day reopens empty (ADR-0009); first tap only asks */
     admDelArm: function () { var d = admDay(); if (d && d.canDelete) { ui.adm.delArm = d.label; rerender(); } },
     admDelCancel: function () { ui.adm.delArm = null; rerender(); },
@@ -2219,7 +2235,7 @@
       }, function (e) { ui.adm.busy = false; ui.adm.delArm = null; toast(e.message || 'Could not delete the draw'); admLoad().then(rerender); });
     },
     /* Skip: a real day is sealed now (drand round ~30 s ahead), then the usual OTP → draw; first tap only asks */
-    admSkipArm: function () { var d = admDay(); if (d && d.canSkip) { ui.adm.skipArm = d.label; rerender(); } },
+    admSkipArm: function () { var d = admDay(); if (d && d.canSkip) { ui.adm.skipArm = d.label; ui.adm.resetArm = null; rerender(); } },
     admSkipCancel: function () { ui.adm.skipArm = null; rerender(); },
     admSkip: function () {
       var d = admDay(); if (!d || ui.adm.busy || ui.adm.skipArm !== d.label) return; ui.adm.busy = true;

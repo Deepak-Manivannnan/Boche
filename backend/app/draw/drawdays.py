@@ -115,6 +115,54 @@ def skip_to_draw(db: Session, label: str, now: datetime) -> m.DrawDay:
     return day
 
 
+# ---------------------------------------------------------------- Reset entries (prototype demos)
+
+
+class ResetRefused(Exception):
+    def __init__(self, status: int, detail: str):
+        super().__init__(detail)
+        self.status, self.detail = status, detail
+
+
+def _entered_counts(db: Session, day: m.DrawDay) -> tuple[int, int]:
+    """(scratch cards, lucky numbers) entered into this day."""
+    cards = db.scalar(sa.select(sa.func.count()).select_from(m.Card).where(m.Card.draw_day_id == day.id))
+    tickets = db.scalar(
+        sa.select(sa.func.count()).select_from(m.Ticket).where(m.Ticket.draw_day_id == day.id)
+    )
+    return cards, tickets
+
+
+def can_reset(db: Session, day: m.DrawDay, now: datetime) -> bool:
+    return day.kind == "real" and accepts_entries(day, now) and _entered_counts(db, day)[0] > 0
+
+
+def reset_entries(db: Session, label: str, admin: m.User, now: datetime) -> m.DrawDay:
+    """While a real day still takes entries, give every entered card back to its owner (scratched, not
+    entered) so it can be entered again; the day's counts go back to 0. Nothing is drawn, sealed or deleted,
+    and orders, cards and lucky numbers stay with their owners. Recorded in the run log."""
+    day = db.scalar(sa.select(m.DrawDay).where(m.DrawDay.label == label).with_for_update())
+    if day is None:
+        raise ResetRefused(404, "No such Draw day")
+    if day.kind != "real":
+        raise ResetRefused(409, "Only a real day's entries can be reset")
+    if not accepts_entries(day, now):
+        raise ResetRefused(
+            409, "Entries for this Draw day have closed; delete the draw instead once it has run"
+        )
+    cards, tickets = _entered_counts(db, day)
+    if cards == 0:
+        raise ResetRefused(409, "No cards have been entered into this draw")
+    db.execute(sa.update(m.Ticket).where(m.Ticket.draw_day_id == day.id).values(draw_day_id=None))
+    db.execute(
+        sa.update(m.Card).where(m.Card.draw_day_id == day.id).values(draw_day_id=None, entered_at=None)
+    )
+    log_run(db, day, admin, "entries-reset", now, cards=cards, tickets=tickets)
+    db.commit()
+    db.expire_all()
+    return db.scalar(sa.select(m.DrawDay).where(m.DrawDay.label == label))
+
+
 # ---------------------------------------------------------------- Delete today's draw (ADR-0009)
 
 
