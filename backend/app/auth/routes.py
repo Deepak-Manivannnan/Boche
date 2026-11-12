@@ -28,6 +28,9 @@ from app.shop.routes import Delivery
 router = APIRouter(prefix="/api")
 Db = Annotated[Session, Depends(get_db)]
 TAKEN = "This mobile number is already registered. Please use a different number."
+LINKED = (
+    "This Google account is already linked to another account. Please try again with a different account."
+)
 
 
 class GoogleSignIn(BaseModel):
@@ -251,9 +254,7 @@ def connect_google(body: GoogleSignIn, request: Request, db: Db) -> dict:
         raise HTTPException(status_code=409, detail="A Google account is already connected")
     who = _google(request, body.credential)
     if db.scalar(sa.select(m.User.id).where(sa.or_(m.User.google_sub == who.sub, m.User.email == who.email))):
-        raise HTTPException(
-            status_code=409, detail="This Google account already belongs to another Boche account"
-        )
+        raise HTTPException(status_code=409, detail=LINKED)  # blocked: nothing is changed on either account
     user.google_sub, user.email, user.picture = who.sub, who.email, _photo(who.picture)
     db.commit()
     return user_json(user)

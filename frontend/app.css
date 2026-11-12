@@ -404,6 +404,16 @@ textarea.input { height: 84px; padding: 12px 16px; resize: none; }
 .prof-head { display: flex; align-items: center; gap: 14px; padding: 8px 16px 18px; }
 .prof-head .avatar { width: 62px; height: 62px; border-radius: 20px; font-size: 22px; }
 .prof-name { font-family: var(--serif); font-size: 22px; font-weight: 600; }
+.field-l .opt-tag { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--muted); }
+/* Mobile sign-in: once the code is sent the number is locked (Change unlocks it) and the code boxes show below */
+.phone-field.is-sent input { color: var(--ink-2); }
+.phone-field .mob-change { flex: none; padding: 0 14px; font-size: 13px; font-weight: 600; }
+/* Connect with Google refused (that Google account belongs to another account): a warning, not a quiet line */
+.rule-note.gc-warn { background: #FDF0EC; border-color: #F2CDBF; color: #8A3B1F; }
+/* The name in the profile header edits in place: a pen appears beside it on hover or keyboard focus */
+.prof-name-btn { display: inline-flex; align-items: center; gap: 8px; padding: 0; background: none; border: 0; color: inherit; text-align: left; cursor: pointer; }
+.prof-pen { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: var(--gold-dd); background: #FFF6DC; opacity: 0; transform: scale(.85); transition: opacity .15s, transform .15s; }
+.prof-name-btn:hover .prof-pen, .prof-name-btn:focus-visible .prof-pen { opacity: 1; transform: none; }
 .group-foot { text-align: center; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 26px 0 6px; }
 
 /* ---------- Sheet / toast ---------- */

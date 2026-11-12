@@ -140,7 +140,11 @@ def test_a_google_account_already_used_cannot_be_connected_to_another(make_clien
     mobile_sign_in(browser, "9847099999")
     browser.post("/api/auth/signup", json={"name": "Meera K", "age": 29})
     res = browser.post("/api/me/google", json={"credential": "arun-token-xxxxxxxxxx"})
-    assert res.status_code == 409 and "another" in res.json()["detail"]
+    assert res.status_code == 409
+    assert res.json()["detail"] == (
+        "This Google account is already linked to another account. Please try again with a different account."
+    )
+    assert browser.get("/api/me").json()["hasGoogle"] is False  # nothing changed on Meera's account
 
 
 # ---------------------------------------------------------------- the profile

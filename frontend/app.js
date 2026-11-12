@@ -132,6 +132,7 @@
 
   /* ---------- Icons ---------- */
   var ICONS = {
+    pen: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/>',
     home: '<path d="M3 9.5l9-7 9 7V20a2 2 0 0 1-2 2h-4v-7H9v7H5a2 2 0 0 1-2-2z"/>',
     card: '<rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/>',
     qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/>',
@@ -391,36 +392,35 @@
   }
   function restoreSignup(s) {   /* after a reload in the middle of signing up */
     ui.auth = { via: s.via, name: s.name, email: s.email, mobile: s.mobile };
-    if (s.step === 'profile') { ui.prof = { name: s.name || '', age: '', addrOpen: false, A: null }; history.replaceState(null, '', '/create-profile'); }
+    if (s.step === 'profile') { ui.prof = newProfile(s.name); history.replaceState(null, '', '/create-profile'); }
     else history.replaceState(null, '', '/mobile');
   }
+  /* One page: the number, then (once the code is sent) the 4 code boxes right under it */
   SCREENS.mobile = function () {
-    var g = ui.auth && ui.auth.via === 'google', first = g ? (ui.auth.name || '').split(' ')[0] : '';
+    var A = ui.auth || {}, g = A.via === 'google', first = g ? (A.name || '').split(' ')[0] : '', sent = !!A.sent;
     return topbar('', 'welcome') + '<div class="auth">' +
       '<h1>' + (g ? 'Add your mobile number' : 'Continue with mobile') + '</h1>' +
       '<p class="lead">' + (g ? 'Hi ' + esc(first || 'there') + '! Verify your number to finish creating your account.' : 'Sign in or create an account. We’ll send a 4-digit code by SMS.') + '</p>' +
-      '<div class="phone-field mt16"><span class="cc">+91</span><input id="mobile" inputmode="numeric" maxlength="10" placeholder="10-digit mobile number" autocomplete="tel-national" value="' + esc(ui.mobile || '') + '"></div>' +
+      '<div class="phone-field mt16' + (sent ? ' is-sent' : '') + '"><span class="cc">+91</span><input id="mobile" inputmode="numeric" maxlength="10" placeholder="10-digit mobile number" autocomplete="tel-national" value="' + esc(ui.mobile || '') + '"' + (sent ? ' readonly' : '') + '>' +
+        (sent ? '<button class="link mob-change" data-act="changeNumber">Change</button>' : '') + '</div>' +
       '<div class="err-text" id="mobErr"></div>' +
-      '<button class="btn btn-gold mt16" id="mobGo" data-act="sendCode" disabled>Send code</button></div>';
+      (sent
+        ? '<div class="field-l" style="margin-top:20px">Enter the 4-digit code sent by SMS</div>' +
+          '<div class="otp" id="otp">' + otpBoxes(4) + '</div><div class="err-text" id="otpErr"></div>' +
+          '<button class="btn btn-gold mt16" data-otp-btn data-act="verifyOtp" disabled>Verify & continue</button>' +
+          '<p class="fine center mt16" id="resend"></p>'
+        : '<button class="btn btn-gold mt16" id="mobGo" data-act="sendCode" disabled>Send code</button>') + '</div>';
   };
   AFTER.mobile = function () {
     ui.auth = ui.auth || { via: 'mobile' };
-    wireMobile('mobile', 'mobGo', 'mobErr', function () { ACTIONS.sendCode(); });
+    if (ui.auth.sent) wireOtp(function () { ACTIONS.verifyOtp(); }, 60);   /* the server sends at most one code a minute */
+    else wireMobile('mobile', 'mobGo', 'mobErr', function () { ACTIONS.sendCode(); });
     if (ui.auth.err) { $('mobErr').textContent = ui.auth.err; ui.auth.err = ''; }   /* e.g. "already registered" */
-  };
-  SCREENS.otp = function () {
-    return topbar('', 'mobile') + '<div class="auth"><h1>Enter the code</h1>' +
-      '<p class="lead">Sent by SMS to +91 ' + esc(fmtMobile(ui.mobile || '')) + ' · <a class="link" href="/mobile">Change</a></p>' +
-      '<div class="otp mt24" id="otp">' + otpBoxes(4) + '</div><div class="err-text" id="otpErr"></div>' +
-      '<button class="btn btn-gold mt16" data-otp-btn data-act="verifyOtp" disabled>Verify & continue</button>' +
-      '<p class="fine center mt16" id="resend"></p></div>';
-  };
-  AFTER.otp = function () {
-    if (!/^[6-9]\d{9}$/.test(ui.mobile || '')) { go('mobile'); return; }
-    wireOtp(function () { ACTIONS.verifyOtp(); }, 60);   /* the server sends at most one code a minute */
   };
   /* Create the profile: name (from Google when signing up with Google, always editable), age (18+), and an
      optional delivery address. The button appears only once the name and age are filled in. */
+  /* The form's state: the address form is always shown (optional), its recipient name following the name above */
+  function newProfile(name) { var A = addrBlank(); A.addr.name = name || ''; return { name: name || '', age: '', addrOpen: true, A: A }; }
   function profAge(P) { var n = +P.age; return /^\d{1,3}$/.test(P.age) && n >= 18 && n <= 120; }
   function profAddrStarted(P) { var a = P.A && P.A.addr; return !!(P.addrOpen && a && (a.pin || a.house.trim() || a.street.trim())); }
   function profOk() { var P = ui.prof; return !!P && P.name.trim().length >= 2 && profAge(P) && (!profAddrStarted(P) || addrOk(P.A)); }
@@ -431,8 +431,7 @@
       '<div class="field-l">Full name</div><input id="pfName" class="input" autocomplete="name" maxlength="100" placeholder="Your name" value="' + esc(P.name) + '">' +
       '<div class="field-l">Age</div><input id="pfAge" class="input" inputmode="numeric" maxlength="3" placeholder="Your age" value="' + esc(P.age) + '">' +
       '<div class="err-text" id="pfErr"></div>' +
-      (P.addrOpen ? '<div class="field-l" style="margin-top:20px">Delivery address <span class="li-s">(optional)</span></div>' + addrForm(P.A)
-        : '<button class="link mt16" data-act="pfAddr">' + ic('plus', 13) + ' Add a delivery address (optional)</button>') +
+      '<div class="field-l" style="margin-top:20px">Delivery address <span class="opt-tag">(optional)</span></div>' + addrForm(P.A) +
       '</div><div class="sticky-cta"><button class="btn btn-gold" id="pfGo" data-act="createProfile"' + (profOk() ? '' : ' disabled') + '>Create profile</button></div></div>';
   };
   AFTER['create-profile'] = function () {
@@ -442,11 +441,15 @@
       $('pfErr').textContent = P.age && /^\d+$/.test(P.age) && +P.age < 18 ? 'You must be 18 or older to join the Lucky Draw.' : '';
     }
     var nm = $('pfName'), ag = $('pfAge');
-    nm.addEventListener('input', function () { P.name = nm.value; upd(); });
+    nm.addEventListener('input', function () {
+      var an = $('adName');   /* the address's recipient follows the name until it is changed there */
+      if (P.A.addr.name === P.name) { P.A.addr.name = nm.value; if (an) an.value = nm.value; }
+      P.name = nm.value; upd();
+    });
     ag.addEventListener('input', function () { ag.value = ag.value.replace(/\D/g, '').slice(0, 3); P.age = ag.value; upd(); });
     ag.addEventListener('keydown', function (e) { if (e.key === 'Enter' && profOk()) ACTIONS.createProfile(); });
-    if (P.addrOpen && $('adPin')) wireAddr(P.A, 'create-profile', function () { if (profOk()) ACTIONS.createProfile(); }, upd);
-    else if (!P.name) nm.focus(); else if (!P.age) ag.focus();
+    wireAddr(P.A, 'create-profile', function () { if (profOk()) ACTIONS.createProfile(); }, upd, true);
+    if (!P.A.focusNext && !P.A.area) { if (!P.name) nm.focus(); else if (!P.age) ag.focus(); }
     upd();
   };
 
@@ -1115,7 +1118,7 @@
         '<div class="addr-auto">' + ic('pin', 15) + '<span>' + esc(teaAreaLine({ po: area.po, district: area.district, pin: a.pin })) + '</span></div>' : '');
   }
   /* Wires the form on the current screen; onDone runs on Enter in the last field once valid */
-  function wireAddr(A, route, onDone, onChange) {
+  function wireAddr(A, route, onDone, onChange, noFocus) {
     var pin = $('adPin'), a = A.addr;
     pin.addEventListener('input', function () {
       pin.value = pin.value.replace(/\D/g, '').slice(0, 6);
@@ -1132,7 +1135,7 @@
       el.addEventListener('input', function () { a[f[1]] = el.value; if (onChange) onChange(); else $('adGo').disabled = !addrOk(A); });
       el.addEventListener('keydown', function (e) { if (e.key === 'Enter') { var nx = { adName: 'adHouse', adHouse: 'adStreet' }[f[0]]; if (nx) $(nx).focus(); else if (addrOk(A)) onDone(); } });
     });
-    if (!A.area) { if (A.look !== 'loading') pin.focus(); }
+    if (!A.area) { if (A.look !== 'loading' && !noFocus) pin.focus(); }
     else if (A.focusNext) { A.focusNext = false; var h = $('adHouse'); if (h) h.focus(); }
   }
   /* Kerala only: prefix check first, then India Post lookup for district + post offices.
@@ -1871,10 +1874,11 @@
       return '<button class="li" ' + act + '><span class="li-ic">' + ic(icn, 18) + '</span><div class="li-main"><div class="li-t">' + title + '</div>' + (sub ? '<div class="li-s">' + sub + '</div>' : '') + '</div>' + (extra == null ? '<span class="li-chev">' + ic('chev', 18) + '</span>' : extra) + '</button>';
     }
     return topbar('Profile', '') +
-      '<div class="prof-head"><span class="avatar-btn" title="Your Google profile photo">' + avatarHtml() + '</span><div><div class="prof-name">' + esc(BC_MEMBER.name) + '</div>' +
+      '<div class="prof-head"><span class="avatar-btn" title="Your Google profile photo">' + avatarHtml() + '</span><div>' +
+      /* The name edits in place: the pen shows on hover (or keyboard focus); tapping the name works on phones */
+      '<button class="prof-name-btn" data-act="editName" aria-label="Edit your name"><span class="prof-name">' + esc(BC_MEMBER.name) + '</span><span class="prof-pen">' + ic('pen', 15) + '</span></button>' +
       '<div class="li-s">' + esc(BC_MEMBER.id) + '</div><span class="badge mt8">' + ic('crown', 12) + esc(t.name) + ' member</span></div></div>' +
       '<div class="pad"><div class="list">' + row('receipt', 'Activity', 'Points, bills and visits', 'data-go="activity"') + '</div><div class="field-l">Account</div><div class="list">' +
-      row('user', esc(BC_MEMBER.name), 'Name' + (ME && ME.age ? ' · age ' + ME.age : '') + ' · tap to edit', 'data-act="editName"') +
       (ME && ME.mobile
         ? row('phone', '+91 ' + esc(fmtMobile(ME.mobile)), 'Mobile · verified by SMS code', 'disabled', '<span class="badge ok">Verified</span>')
         : row('phone', '+91 ' + esc(BC_MEMBER.mobile), 'Mobile', 'disabled', '')) +
@@ -2116,12 +2120,10 @@
       if (!/^[6-9]\d{9}$/.test(ui.mobile || '') || ui.auth.busy) return;
       ui.auth.busy = true;
       BCAPI.post('/auth/otp/send', { mobile: ui.mobile }).then(function () {
-        ui.auth.busy = false; go('otp'); toast('Code sent to +91 ' + fmtMobile(ui.mobile));
+        ui.auth.busy = false; ui.auth.sent = true; rerender(); toast('Code sent to +91 ' + fmtMobile(ui.mobile));
       }, function (e) { ui.auth.busy = false; var el = $('mobErr'); if (el) el.textContent = e.message || 'Could not send the code. Try again.'; });
     },
-    pfAddr: function () {
-      var P = ui.prof; P.addrOpen = true; P.A = addrBlank(); P.A.addr.name = P.name.trim(); rerender();
-    },
+    changeNumber: function () { ui.auth.sent = false; rerender(); var i = $('mobile'); if (i) { i.focus(); i.select(); } },
     createProfile: function () {
       var P = ui.prof; if (!profOk() || P.busy) return;
       var body = { name: P.name.trim(), age: +P.age };
@@ -2153,7 +2155,11 @@
         '<div class="gsi-slot mt16" id="gsiConnect"><span class="mini-spin" aria-label="Loading Google sign-in"></span></div><div class="err-text" id="gcErr"></div>');
       mountGoogleButton('gsiConnect', 'gcErr', function (resp) {
         BCAPI.post('/me/google', { credential: resp.credential }).then(function (u) { ME = u; applyProfile(); closeSheet(); rerender(); toast('Google account connected'); },
-          function (e) { var el = $('gcErr'); if (el) el.textContent = e.message || 'Could not connect the Google account'; });
+          function (e) {   /* e.g. that Google account is already linked to another account: warn, change nothing */
+            var el = $('gcErr'); if (!el) return;
+            el.className = 'rule-note mt12 gc-warn';
+            el.innerHTML = ic('shield', 16) + '<span>' + esc(e.message || 'Could not connect the Google account. Please try again.') + '</span>';
+          });
       });
     },
     sendOtp: function () { if (/^[6-9]\d{9}$/.test(ui.mobile)) go('otp'); },
@@ -2163,7 +2169,7 @@
       go('staff-otp');
     },
     resendOtp: function () {
-      if (parse().name !== 'otp') { toast('OTP resent'); rerender(); return; }   /* the staff demo screen */
+      if (parse().name !== 'mobile') { toast('OTP resent'); rerender(); return; }   /* the staff demo screen */
       BCAPI.post('/auth/otp/send', { mobile: ui.mobile }).then(function () { toast('New code sent'); rerender(); },
         function (e) { var el = $('otpErr'); if (el) el.textContent = e.message || 'Could not send a new code'; });
     },
@@ -2177,11 +2183,11 @@
         if (!r.signup) { signedIn(r, true); return; }   /* a registered number: signed in */
         var s = r.signup;   /* a new account: the profile comes next */
         ui.auth = { via: s.via, name: s.name, email: s.email, mobile: s.mobile };
-        ui.prof = { name: s.name || '', age: '', addrOpen: false, A: null };
+        ui.prof = newProfile(s.name);
         go('create-profile');
       }, function (e) {
         ui.auth.busy = false;
-        if (e.status === 409 && /registered/.test(e.message)) { ui.auth.err = e.message; go('mobile'); return; }
+        if (e.status === 409 && /registered/.test(e.message)) { ui.auth.err = e.message; ui.auth.sent = false; rerender(); return; }
         $('otpErr').textContent = e.message || 'Could not check the code. Try again.'; otpFail();
       });
     },
@@ -2629,7 +2635,7 @@
      SHELL: router, sheet, toast, tabs
      ============================================================ */
   /* Ways in: Google, or a mobile number + SMS code; a new account then creates its profile */
-  var MEMBER_PUBLIC = { welcome: 1, login: 1, mobile: 1, otp: 1, 'create-profile': 1 };
+  var MEMBER_PUBLIC = { welcome: 1, login: 1, mobile: 1, 'create-profile': 1 };
   var STAFF_PUBLIC = { staff: 1, 'staff-otp': 1 };
   var STAFF_APP = { scan: 1, verify: 1 };
   var ADMIN_APP = { 'admin-draw': 1 };
@@ -2789,7 +2795,7 @@
     if (!SES.authed) {
       /* Reloaded in the middle of signing up: pick up where the server says it was */
       var rn = parse().name;
-      if (rn === 'mobile' || rn === 'otp' || rn === 'create-profile') {
+      if (rn === 'mobile' || rn === 'create-profile') {
         BCAPI.get('/auth/signup').then(function (r) { restoreSignup(r.signup); }, function () {
           ui.auth = { via: 'mobile' }; if (rn !== 'mobile') history.replaceState(null, '', '/mobile');
         }).then(function () { render(); });
