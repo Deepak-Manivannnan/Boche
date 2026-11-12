@@ -31,8 +31,8 @@ def run(w, code):
 
 
 def ready(w):
-    """8:15:05 PM IST: the sealed Randomness round has been released."""
-    at(w.admin, 20, 15, 5)
+    """10:15:05 PM IST: the sealed Randomness round has been released."""
+    at(w.admin, 22, 15, 5)
 
 
 def expected_winners(w):
@@ -87,13 +87,13 @@ def test_the_admin_api_offers_no_way_to_edit_or_reject_winners(w):
 
 
 def test_no_otp_before_the_randomness_round_is_released(w):
-    at(w.admin, 20, 10)
+    at(w.admin, 22, 10)
     assert ask_otp(w).status_code == 409
     assert w.state.otp_sender.sent == []
 
 
 def test_no_otp_for_a_day_that_has_not_closed(w):
-    at(w.admin, 19, 0, day=11)
+    at(w.admin, 21, 0, day=11)
     assert w.admin.post("/api/admin/draw-days/2026-11-11/otp").status_code == 404
 
 
@@ -113,7 +113,7 @@ def test_the_founder_gets_an_otp_naming_the_day_ticket_count_and_fingerprint(w):
 def test_a_second_otp_request_within_a_minute_is_refused(w):
     ready(w)
     ask_otp(w)
-    at(w.admin, 20, 15, 30)
+    at(w.admin, 22, 15, 30)
     assert ask_otp(w).status_code == 429
     assert len(w.state.otp_sender.sent) == 1
 
@@ -122,7 +122,7 @@ def test_a_new_otp_replaces_the_old_one(w):
     ready(w)
     ask_otp(w)
     old = w.state.otp_sender.code
-    at(w.admin, 20, 16, 10)
+    at(w.admin, 22, 16, 10)
     ask_otp(w)
     new = w.state.otp_sender.code
     if old != new:
@@ -161,9 +161,9 @@ def test_five_wrong_otps_lock_that_code(w):
 def test_an_otp_expires_after_ten_minutes(w):
     ready(w)
     ask_otp(w)
-    at(w.admin, 20, 24, 50)
+    at(w.admin, 22, 24, 50)
     assert w.admin.get(BASE).json()["otpExpiresAt"] is not None
-    at(w.admin, 20, 25, 6)
+    at(w.admin, 22, 25, 6)
     assert run(w, w.state.otp_sender.code).status_code == 401
 
 
@@ -194,7 +194,7 @@ def test_running_again_returns_the_saved_result_and_never_draws_twice(w, db_engi
     ask_otp(w)
     code = w.state.otp_sender.code
     first = run(w, code).json()
-    at(w.admin, 20, 40)
+    at(w.admin, 22, 40)
     again = run(w, "9999")
     assert again.status_code == 200
     assert again.json()["winners"] == first["winners"]
@@ -274,7 +274,7 @@ def test_with_no_entries_yet_the_admin_sees_todays_draw_at_zero(make_client, db_
     assert len(days) == 1 and (row["label"], row["kind"], row["status"]) == (DAY, "real", "open")
     assert (row["ticketCount"], row["cardCount"]) == (0, 0)
     assert (row["canSkip"], row["canReset"], row["canDelete"], row["canRequestOtp"]) == (False,) * 4
-    assert row["closesAt"] == "2026-11-10T14:30:00+00:00"  # 8:00 PM IST
+    assert row["closesAt"] == "2026-11-10T16:30:00+00:00"  # 10:00 PM IST
     with db_engine.connect() as conn:  # only shown: saved when the first card goes in, so never sealed empty
         assert conn.scalar(sa.select(sa.func.count()).select_from(m.DrawDay)) == 0
 
@@ -285,7 +285,7 @@ def test_with_no_entries_yet_the_admin_sees_todays_draw_at_zero(make_client, db_
     assert set(days[0]) == set(row)  # the same fields as before it was saved
 
 
-def test_after_eight_pm_no_empty_day_is_shown(make_client):
+def test_after_ten_pm_no_empty_day_is_shown(make_client):
     admin = make_client("admin")
-    at(admin, 20, 0)
+    at(admin, 22, 0)
     assert admin.get("/api/admin/draw-days").json() == []

@@ -4,6 +4,7 @@ and delete today's completed draw so the day starts again (ADR-0009). Nothing el
 There is no endpoint that edits or rejects Winners. Deleting erases the whole draw and empties the day; it is
 recorded in the run log and stays visible in the Seal's GitHub history."""
 
+import json
 import logging
 import threading
 from datetime import date, timedelta
@@ -116,7 +117,18 @@ def day_json(db: Session, day: m.DrawDay, now) -> dict:
         "randomness": day.result.randomness if day.result else None,
         "winners": day.result.winners if day.result else None,
         "seeding": _seed_job_json(day.label),
+        "carried": carried_json(db, day) if day.status == "carried" else None,
     }
+
+
+def carried_json(db: Session, day: m.DrawDay) -> dict | None:
+    """Where a carried day's cards went: {"to": label, "cards": n, "tickets": n}, from the run log."""
+    detail = db.scalar(
+        sa.select(m.DrawRun.detail).where(
+            m.DrawRun.draw_day_id == day.id, m.DrawRun.outcome == "carried-over"
+        )
+    )
+    return json.loads(detail) if detail else None
 
 
 def _day(db: Session, label: str) -> m.DrawDay:
@@ -167,6 +179,7 @@ def not_started_json(day: date) -> dict:
         "randomness": None,
         "winners": None,
         "seeding": None,
+        "carried": None,
     }
 
 
@@ -178,7 +191,7 @@ def get_day(label: Label, request: Request, db: Db) -> dict:
 
 @router.post("/draw-days/{label}/skip")
 def skip_wait(label: Label, request: Request, db: Db) -> dict:
-    """Close today's real Draw day now, so the Founder's OTP and the draw don't wait for 8:00 / 8:15 PM."""
+    """Close today's real Draw day now, so the Founder's OTP and the draw don't wait for 10:00 / 10:15 PM."""
     admin = require_admin(request, db)
     state, now = request.app.state, request.app.state.clock.now()
     try:
@@ -249,7 +262,7 @@ def enter_otp_and_run(label: Label, body: OtpEntry, request: Request, db: Db) ->
     state = request.app.state
     try:
         day = run_draw(db, label, admin, body.code, state.clock.now(), state.drand_fetch)
-        publish_results(db, state.clock.now())  # a draw after 8:30 PM is published straight away
+        publish_results(db, state.clock.now())  # a draw after 10:30 PM is published straight away
         db.refresh(day)
     except DrawRefused as e:
         raise HTTPException(status_code=e.status, detail=e.detail) from e

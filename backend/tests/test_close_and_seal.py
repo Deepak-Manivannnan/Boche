@@ -1,4 +1,4 @@
-"""Entries close at 8 PM IST: the Ticket list is frozen, fingerprinted and sealed on GitHub."""
+"""Entries close at 10 PM IST: the Ticket list is frozen, fingerprinted and sealed on GitHub."""
 
 import hashlib
 import json
@@ -59,28 +59,29 @@ def day_row(db_engine, label=DAY):
 
 
 def entered_numbers(client, items=None):
-    paid = buy(client, items or {"p500": 1})
+    """Enter 16 lucky numbers (two 1 kg packs) unless told otherwise: a day needs 10 to be sealed."""
+    paid = buy(client, items or {"p1k": 2})
     for card in paid["cards"]:
         assert enter(client, card["id"]).status_code == 200
     return [n for card in paid["cards"] for n in card["numbers"]]
 
 
-def test_nothing_is_sealed_before_eight_pm(make_client, seals, db_engine):
+def test_nothing_is_sealed_before_ten_pm(make_client, seals, db_engine):
     client = make_client()
-    at(client, 19, 0)
+    at(client, 21, 0)
     entered_numbers(client)
-    at(client, 19, 59, 59)
+    at(client, 21, 59, 59)
     tick(client)
     assert day_row(db_engine).status == "open"
     assert client.get(f"/api/public/days/{DAY}/tickets.csv").status_code == 404
     assert seals.calls == 0
 
 
-def test_at_eight_pm_the_list_is_frozen_and_published_as_the_canonical_csv(make_client, seals, db_engine):
+def test_at_ten_pm_the_list_is_frozen_and_published_as_the_canonical_csv(make_client, seals, db_engine):
     client = make_client()
     at(client, 18, 0)
     numbers = entered_numbers(client, {"p1k": 2, "p250": 1})
-    at(client, 20, 0, 1)
+    at(client, 22, 0, 1)
     tick(client)
     day = day_row(db_engine)
     assert day.status == "sealed"
@@ -92,21 +93,21 @@ def test_at_eight_pm_the_list_is_frozen_and_published_as_the_canonical_csv(make_
     assert day.fingerprint == hashlib.sha256(res.content).hexdigest()
 
 
-def test_the_seal_names_the_day_count_fingerprint_and_a_round_released_at_eight_fifteen(make_client, seals):
+def test_the_seal_names_the_day_count_fingerprint_and_a_round_released_at_ten_fifteen(make_client, seals):
     client = make_client()
     at(client, 18, 0)
     entered_numbers(client)
-    at(client, 20, 0, 5)
+    at(client, 22, 0, 5)
     tick(client)
     seal = json.loads(seals.files[DAY])
     csv = client.get(f"/api/public/days/{DAY}/tickets.csv").content
     assert seal["scheme"] == "boche-draw-v1"
-    assert (seal["draw_day"], seal["kind"], seal["ticket_count"]) == (DAY, "real", 3)
+    assert (seal["draw_day"], seal["kind"], seal["ticket_count"]) == (DAY, "real", 16)
     assert seal["fingerprint"] == hashlib.sha256(csv).hexdigest()
     assert seal["drand"]["chain_hash"] == verify.DRAND_CHAIN
     released = verify.round_time(seal["drand"]["round"])
     assert (
-        datetime(2026, 11, 10, 20, 15, tzinfo=IST) <= released < datetime(2026, 11, 10, 20, 15, 3, tzinfo=IST)
+        datetime(2026, 11, 10, 22, 15, tzinfo=IST) <= released < datetime(2026, 11, 10, 22, 15, 3, tzinfo=IST)
     )
     assert datetime.fromisoformat(seal["sealed_at"]) < released
 
@@ -115,7 +116,7 @@ def test_the_seal_on_github_is_exactly_the_one_served_by_the_site(make_client, s
     client = make_client()
     at(client, 18, 0)
     entered_numbers(client)
-    at(client, 20, 1)
+    at(client, 22, 1)
     tick(client)
     assert client.get(f"/api/public/days/{DAY}/seal.json").content == seals.files[DAY]
 
@@ -124,10 +125,10 @@ def test_closing_again_changes_nothing_and_publishes_once(make_client, seals, db
     client = make_client()
     at(client, 18, 0)
     entered_numbers(client)
-    at(client, 20, 0, 1)
+    at(client, 22, 0, 1)
     tick(client)
     first = day_row(db_engine)
-    at(client, 20, 5)
+    at(client, 22, 5)
     tick(client)
     again = day_row(db_engine)
     assert (again.fingerprint, again.drand_round, again.sealed_at) == (
@@ -143,11 +144,11 @@ def test_a_failed_github_commit_is_retried_without_changing_the_seal(make_client
     at(client, 18, 0)
     entered_numbers(client)
     seals.fail_next = 1
-    at(client, 20, 0, 1)
+    at(client, 22, 0, 1)
     tick(client)
     assert day_row(db_engine).seal_commit_sha is None
     sealed = day_row(db_engine).seal_json
-    at(client, 20, 0, 40)
+    at(client, 22, 0, 40)
     tick(client)
     day = day_row(db_engine)
     assert day.seal_commit_sha == f"sha-{DAY}"
@@ -158,11 +159,11 @@ def test_a_failed_github_commit_is_retried_without_changing_the_seal(make_client
 def test_cancelled_tickets_and_entries_for_tomorrow_are_not_in_the_list(make_client, seals, db_engine):
     arun, admin = make_client("arun"), make_client("admin")
     at(arun, 18, 0)
-    kept = entered_numbers(arun, {"p250": 1})
+    kept = entered_numbers(arun)
     refunded = buy(arun, {"p500": 1})
     enter(arun, refunded["cards"][0]["id"])
     admin.post(f"/api/admin/orders/{refunded['id']}/refund")
-    at(arun, 20, 0, 0)
+    at(arun, 22, 0, 0)
     tomorrow = buy(arun, {"p250": 1})
     assert enter(arun, tomorrow["cards"][0]["id"]).json()["drawDay"] == "2026-11-11"
     tick(arun)
@@ -170,23 +171,23 @@ def test_cancelled_tickets_and_entries_for_tomorrow_are_not_in_the_list(make_cli
 
 
 def test_a_late_seal_picks_a_round_still_in_the_future(make_client, seals, db_engine):
-    """If the server was asleep and only seals at 8:20 PM, the 8:15 round is already public. Sealing must
+    """If the server was asleep and only seals at 10:20 PM, the 10:15 round is already public. Sealing must
     then name a round that nobody can know yet, or someone could choose the list to suit the randomness."""
     client = make_client()
     at(client, 18, 0)
     entered_numbers(client)
-    at(client, 20, 20)
+    at(client, 22, 20)
     tick(client)
     day = day_row(db_engine)
     assert verify.round_time(day.drand_round) > day.sealed_at.replace(tzinfo=UTC)
     assert day.draw_not_before.replace(tzinfo=UTC) >= verify.round_time(day.drand_round)
 
 
-def test_any_api_request_after_eight_pm_closes_the_day_even_without_a_tick(make_client, seals, db_engine):
+def test_any_api_request_after_ten_pm_closes_the_day_even_without_a_tick(make_client, seals, db_engine):
     client = make_client()
     at(client, 18, 0)
     entered_numbers(client)
-    at(client, 20, 3)
+    at(client, 22, 3)
     client.get("/api/me")
     assert day_row(db_engine).status == "sealed"
 
@@ -196,7 +197,7 @@ def test_without_a_github_token_the_day_still_closes_and_waits_to_publish(make_c
     client.app.state.seal_publisher = None
     at(client, 18, 0)
     entered_numbers(client)
-    at(client, 20, 1)
+    at(client, 22, 1)
     assert tick(client)["unpublished"] == [DAY]
     assert day_row(db_engine).status == "sealed"
 
@@ -209,7 +210,7 @@ def test_a_scheduler_ping_by_get_seals_once_and_repeat_pings_change_nothing(make
     client = make_client()
     at(client, 18, 0)
     entered_numbers(client)
-    at(client, 20, 0, 1)
+    at(client, 22, 0, 1)
     assert client.get("/api/tick").status_code == 200
     assert client.get("/api/tick").status_code == 200
     assert day_row(db_engine).status == "sealed"

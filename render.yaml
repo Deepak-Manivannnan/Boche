@@ -33,7 +33,7 @@ services:
       # only to these numbers. Personal data and this repository is public: set it in the dashboard only.
       - key: ADMIN_MOBILES
         sync: false
-      # Public GitHub repository that receives each day's Seal at 8 PM (ADR-0003).
+      # Public GitHub repository that receives each day's Seal at 10 PM (ADR-0003).
       - key: SEALS_REPO
         value: Deepak-Manivannnan/boche-draw-seals
       # Fine-grained token: Contents read/write on the seals repository only. Set in the dashboard.

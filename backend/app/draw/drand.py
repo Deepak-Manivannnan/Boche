@@ -19,7 +19,7 @@ def first_round_at_or_after(t: datetime) -> int:
 
 
 def round_for_seal(draw_not_before: datetime, sealed_at: datetime) -> int:
-    """The Randomness round a Seal names: the one released at the scheduled draw time (8:15 PM IST),
+    """The Randomness round a Seal names: the one released at the scheduled draw time (10:15 PM IST),
     or, if sealing happens late, one still safely in the future. The list is always fixed before the
     value exists."""
     return max(first_round_at_or_after(draw_not_before), first_round_at_or_after(sealed_at + SAFETY_MARGIN))

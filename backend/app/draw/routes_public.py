@@ -20,8 +20,8 @@ Label = Annotated[str, Path(pattern=r"^[A-Za-z0-9-]{1,40}$")]
 
 @router.api_route("/tick", methods=["GET", "POST"])
 def tick(request: Request) -> dict:
-    """Apply any Draw day step that is due. A scheduler pings it (GET or POST) near 8:00, 8:15, 8:30 PM IST;
-    every other API request does the same, so this only matters while the site is otherwise idle."""
+    """Apply any Draw day step that is due. A scheduler pings it (GET or POST) near 10:00, 10:15 and 10:30 PM
+    IST; every other API request does the same, so this only matters while the site is otherwise idle."""
     state = request.app.state
     return advance(state.sessionmaker, state.clock.now(), state.seal_publisher)
 
@@ -67,10 +67,11 @@ def result(label: Label, db: Db) -> JSONResponse:
 
 @router.get("/public/days")
 def recent_days(db: Db) -> list[dict]:
-    """The last 30 Draw days that have closed, newest first, with Winners once published."""
+    """The last 30 Draw days that have closed, newest first, with Winners once published. A `carried` day
+    (fewer Tickets than Winners: no Seal, no draw, cards moved to the next day) is listed too, to say so."""
     days = db.scalars(
         sa.select(m.DrawDay)
-        .where(m.DrawDay.seal_json.is_not(None))
+        .where(sa.or_(m.DrawDay.seal_json.is_not(None), m.DrawDay.status == "carried"))
         .order_by(m.DrawDay.day.desc(), m.DrawDay.id.desc())
         .limit(30)
     ).all()

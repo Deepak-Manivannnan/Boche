@@ -58,7 +58,7 @@ The DB tests refuse to run unless the test database's name ends in `_test`, beca
 
 ## Run a full day in test mode
 
-No need to wait for 8 PM. Sign in at `/staff` with an email listed in `ADMIN_EMAILS`, open **Tonight's draw**, then:
+No need to wait for 10 PM. Sign in at `/staff` with an email listed in `ADMIN_EMAILS`, open **Tonight's draw**, then:
 
 1. **New test day**, then **Add 5,000 tickets** (20 test customers buy tea through the real paid-order path; press it again for more, or use the script below for 15,000).
 2. **Close entries now**: the list is frozen, fingerprinted and sealed to GitHub; the Seal names a drand round about 30 s ahead.
@@ -80,10 +80,10 @@ mysql+pymysql://<user>:<password>@<host>:4000/boche?ssl_ca=/etc/ssl/certs/ca-cer
 
 ### Scheduled pings
 
-Render's free plan sleeps after about 15 idle minutes, and the Draw day steps (seal at 8:00, OTP window from 8:15, publish at 8:30 PM IST) only run when the app gets a request. `POST /api/tick` (GET also works) applies whatever step is due and is safe to call any number of times.
+Render's free plan sleeps after about 15 idle minutes, and the Draw day steps (seal at 10:00, OTP window from 10:15, publish at 10:30 PM IST; ADR-0011) only run when the app gets a request. `POST /api/tick` (GET also works) applies whatever step is due and is safe to call any number of times.
 
-- **GitHub Actions** (`.github/workflows/tick.yml`) pings at 19:55, 20:00, 20:15, 20:30 and 20:35 IST. GitHub can start scheduled runs several minutes late, so the 19:55 run wakes the app early and the extra runs cover delays. Set a repository variable `TICK_URL` to point it at a different host. Scheduled workflows only run from the default branch.
-- **cron-job.org** (more punctual, needs a free account): create jobs that send `POST https://boche.onrender.com/api/tick` daily at 19:58, 20:00, 20:15 and 20:30 Asia/Kolkata, with a 60 s timeout.
+- **GitHub Actions** (`.github/workflows/tick.yml`) pings at 21:55, 22:00, 22:15, 22:30 and 22:35 IST. GitHub can start scheduled runs several minutes late, so the 21:55 run wakes the app early and the extra runs cover delays. Set a repository variable `TICK_URL` to point it at a different host. Scheduled workflows only run from the default branch.
+- **cron-job.org** (more punctual, needs a free account): create jobs that send `POST https://boche.onrender.com/api/tick` daily at 21:58, 22:00, 22:15 and 22:30 Asia/Kolkata, with a 60 s timeout.
 
 Any visit to the site also triggers the due step, so the pings only matter while nobody has the app open.
 

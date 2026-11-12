@@ -1,5 +1,5 @@
 """Deleting today's completed draw (ADR-0009): the Winners, Claims, sealed list and Seal are erased, the
-entered cards go back to their owners, and the day reopens so it can be drawn again (Skip, or at 8:00 PM)."""
+entered cards go back to their owners, and the day reopens so it can be drawn again (Skip, or at 10:00 PM)."""
 
 # ruff: noqa: F811 (tests take the imported `w` fixture as their argument, the usual pytest pattern)
 
@@ -48,7 +48,7 @@ def test_deleting_erases_the_draw_and_reopens_the_day_empty(w, db_engine):
     assert res.status_code == 200, res.text
     day = res.json()
     assert (day["status"], day["ticketCount"], day["winners"], day["fingerprint"]) == ("open", 0, None, None)
-    assert day["closesAt"].startswith("2026-11-10T14:30:00")  # 8:00 PM IST again
+    assert day["closesAt"].startswith("2026-11-10T16:30:00")  # 10:00 PM IST again
     assert DAY not in w.state.seal_publisher.files  # the Seal is gone from GitHub
     assert w.arun.get(f"/api/public/days/{DAY}/result.json").status_code == 404
     assert DAY not in [d["label"] for d in w.arun.get("/api/public/days").json()]
@@ -87,12 +87,12 @@ def test_a_draw_that_has_not_run_cannot_be_deleted(w):
     assert res.status_code == 409 and "not been run" in res.json()["detail"]
 
 
-def test_no_delete_after_8pm(w):
+def test_no_delete_after_10pm(w):
     run_skipped_draw(w)
-    at(w.admin, 20, 0)
+    at(w.admin, 22, 0)
     assert admin_day(w)["canDelete"] is False
     res = delete(w)
-    assert res.status_code == 409 and "before 8:00 PM" in res.json()["detail"]
+    assert res.status_code == 409 and "before 10:00 PM" in res.json()["detail"]
     assert admin_day(w)["status"] == "published"
 
 

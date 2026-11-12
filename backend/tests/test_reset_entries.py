@@ -69,8 +69,8 @@ def test_not_once_entries_have_closed(w):
     assert admin_day(w)["ticketCount"] == 16  # the sealed list is untouched
 
 
-def test_not_after_8pm(w):
-    at(w.arun, 20, 0, 1)
+def test_not_after_10pm(w):
+    at(w.arun, 22, 0, 1)
     w.arun.post("/api/tick")
     assert reset(w).status_code == 409
 

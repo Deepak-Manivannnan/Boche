@@ -1,5 +1,5 @@
-"""Ticket 10: results are published at 8:30 PM IST (or right after a later draw), Customers see their outcome,
-Claims are stored on the server, and the public files of a Draw day pass the real Verifier."""
+"""Ticket 10: results are published at 10:30 PM IST (or right after a later draw), Customers see their
+outcome, Claims are stored on the server, and the public files of a Draw day pass the real Verifier."""
 
 import json
 
@@ -31,9 +31,9 @@ def winning_card(w, result):
 # ---------------------------------------------------------------- when results become visible
 
 
-def test_nothing_is_public_before_eight_thirty_even_after_the_draw(w):
+def test_nothing_is_public_before_ten_thirty_even_after_the_draw(w):
     draw(w)
-    at(w.arun, 20, 29, 59)
+    at(w.arun, 22, 29, 59)
     w.arun.post("/api/tick")
     assert w.arun.get(RESULT).status_code == 404
     assert all(d["label"] != DAY or d["winners"] is None for d in w.arun.get("/api/public/days").json())
@@ -41,7 +41,7 @@ def test_nothing_is_public_before_eight_thirty_even_after_the_draw(w):
 
 def test_at_eight_thirty_the_result_is_published(w, db_engine):
     drawn = draw(w)
-    at(w.arun, 20, 30, 0)
+    at(w.arun, 22, 30, 0)
     w.arun.post("/api/tick")
     res = w.arun.get(RESULT)
     assert res.status_code == 200
@@ -51,8 +51,8 @@ def test_at_eight_thirty_the_result_is_published(w, db_engine):
         assert conn.scalar(sa.select(m.DrawDay.status).where(m.DrawDay.label == DAY)) == "published"
 
 
-def test_a_draw_after_eight_thirty_is_published_straight_away(w):
-    draw(w, 21, 10)
+def test_a_draw_after_ten_thirty_is_published_straight_away(w):
+    draw(w, 23, 10)
     assert w.arun.get(RESULT).status_code == 200
 
 
@@ -66,7 +66,7 @@ def test_an_undrawn_day_is_never_published(w):
 
 
 def test_the_public_result_shows_masked_winners_and_no_private_data(w):
-    draw(w, 20, 40)
+    draw(w, 22, 40)
     body = w.arun.get(RESULT).json()
     assert body["winners"][0]["name"] == "Arun T."  # "Arun Tester" -> first name and last initial
     text = json.dumps(body)
@@ -74,7 +74,7 @@ def test_the_public_result_shows_masked_winners_and_no_private_data(w):
 
 
 def test_the_public_days_list_carries_each_published_result(w):
-    draw(w, 20, 40)
+    draw(w, 22, 40)
     days = w.arun.get("/api/public/days").json()
     day = next(d for d in days if d["label"] == DAY)
     assert day["status"] == "published" and len(day["winners"]) == 10
@@ -82,7 +82,7 @@ def test_the_public_days_list_carries_each_published_result(w):
 
 
 def test_a_draw_days_public_files_pass_the_real_verifier(w, tmp_path):
-    draw(w, 20, 40)
+    draw(w, 22, 40)
     for name in ("tickets.csv", "seal.json", "result.json"):
         res = w.arun.get(f"/api/public/days/{DAY}/{name}")
         # Saved under the browser's download name, e.g. tickets-2026-11-10.csv
@@ -113,7 +113,7 @@ def test_a_customer_sees_their_own_wins_only_after_publish(w):
     result = draw(w)
     card = winning_card(w, result)
     assert next(c for c in my_cards(w.arun) if c["id"] == card["id"])["wins"] == []
-    at(w.arun, 20, 30)
+    at(w.arun, 22, 30)
     w.arun.post("/api/tick")
     wins = next(c for c in my_cards(w.arun) if c["id"] == card["id"])["wins"]
     assert wins and {x["ticket"] for x in wins} <= set(card["numbers"])
@@ -124,7 +124,7 @@ def test_a_customer_sees_their_own_wins_only_after_publish(w):
 
 
 def test_a_winner_can_claim_once_and_the_claim_is_stored(w):
-    card = winning_card(w, draw(w, 20, 40))
+    card = winning_card(w, draw(w, 22, 40))
     res = w.arun.post("/api/claims", json={"cardId": card["id"]})
     assert res.status_code == 201, res.text
     claim = res.json()
@@ -136,7 +136,7 @@ def test_a_winner_can_claim_once_and_the_claim_is_stored(w):
 def test_a_card_without_a_winning_ticket_cannot_be_claimed(make_client):
     # 12 single-Ticket cards and only 10 Winners: at least two cards must lose.
     w = sealed_day(make_client, packs=1, single_cards=12)
-    won = {x["ticket"] for x in draw(w, 20, 40)["winners"]}
+    won = {x["ticket"] for x in draw(w, 22, 40)["winners"]}
     loser = next(c for c in w.cards if not won & set(c["numbers"]))
     assert w.arun.post("/api/claims", json={"cardId": loser["id"]}).status_code == 409
 
@@ -147,5 +147,5 @@ def test_a_win_cannot_be_claimed_before_results_are_published(w):
 
 
 def test_nobody_can_claim_someone_elses_card(w, make_client):
-    card = winning_card(w, draw(w, 20, 40))
+    card = winning_card(w, draw(w, 22, 40))
     assert make_client("meera").post("/api/claims", json={"cardId": card["id"]}).status_code == 404

@@ -48,7 +48,7 @@ def wire(monkeypatch, w, commits=None):
 
 
 def test_the_verifier_confirms_a_published_day_from_the_live_site(w, monkeypatch):
-    draw(w, 20, 40)
+    draw(w, 22, 40)
     wire(monkeypatch, w)
     report = verify.verify(DAY, verify.LiveSources(SITE, REPO))
     assert report.ok, report.render()
@@ -56,15 +56,15 @@ def test_the_verifier_confirms_a_published_day_from_the_live_site(w, monkeypatch
 
 
 def test_the_verifier_catches_a_seal_rewritten_on_github(w, monkeypatch):
-    draw(w, 20, 40)
+    draw(w, 22, 40)
     seal_time = json.loads(w.seals.files[DAY])["sealed_at"]
-    wire(monkeypatch, w, commits=[seal_time, datetime(2026, 11, 10, 15, 30).isoformat() + "Z"])
+    wire(monkeypatch, w, commits=[seal_time, datetime(2026, 11, 10, 17, 30).isoformat() + "Z"])
     report = verify.verify(DAY, verify.LiveSources(SITE, REPO))
     assert report.status(verify.SEAL_PROVENANCE) == "FAIL"
 
 
 def test_before_publish_the_verifier_reports_the_result_as_missing(w, monkeypatch):
-    draw(w)  # drawn at 8:16 PM, published only at 8:30 PM
+    draw(w)  # drawn at 10:16 PM, published only at 10:30 PM
     wire(monkeypatch, w)
     report = verify.verify(DAY, verify.LiveSources(SITE, REPO))
     assert not report.ok and report.status(verify.FILES) == "FAIL"

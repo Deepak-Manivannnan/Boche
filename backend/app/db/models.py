@@ -214,7 +214,10 @@ class DrawDay(Base):
     label: Mapped[str] = mapped_column(sa.String(40), unique=True)  # "2026-11-10" or "test-…"
     kind: Mapped[str] = mapped_column(enum("real", "test", name="draw_day_kind"))
     day: Mapped[date] = mapped_column(sa.Date, index=True)
-    status: Mapped[str] = mapped_column(enum("open", "sealed", "drawn", "published", name="draw_day_status"))
+    # carried: closed with fewer Tickets than Winners, so never sealed or drawn; cards moved to the next day
+    status: Mapped[str] = mapped_column(
+        enum("open", "sealed", "drawn", "published", "carried", name="draw_day_status")
+    )
     closes_at: Mapped[datetime] = mapped_column(UTCDateTime)
     draw_not_before: Mapped[datetime] = mapped_column(UTCDateTime)
     publish_not_before: Mapped[datetime] = mapped_column(UTCDateTime)

@@ -18,6 +18,7 @@ from app.db import models as m
 from app.draw.lifecycle import close_day
 from app.shop.catalog import MAX_QTY, quote
 from app.shop.payments import MockPaymentProvider, confirm_payment
+from engine import WINNER_COUNT
 
 FAR_FUTURE = timedelta(days=3650)  # a Test day only closes when an Admin says so
 TEST_CUSTOMERS = 20
@@ -153,10 +154,13 @@ def close_test_day(db: Session, label: str, now: datetime, publish_gap: timedelt
     day = test_day(db, label, lock=True)
     if day.status != "open":
         raise TestModeRefused(409, "This Test day is already closed")
-    if (day.ticket_count or 0) == 0 and not db.scalar(
-        sa.select(sa.func.count()).select_from(m.Ticket).where(m.Ticket.draw_day_id == day.id)
-    ):
-        raise TestModeRefused(409, "Seed some tickets first")
+    issued = db.scalar(
+        sa.select(sa.func.count())
+        .select_from(m.Ticket)
+        .where(m.Ticket.draw_day_id == day.id, m.Ticket.status == "issued")
+    )
+    if issued < WINNER_COUNT:  # sealed with fewer, the draw could never run
+        raise TestModeRefused(409, f"A Test day needs at least {WINNER_COUNT} tickets before it can close")
     day.closes_at = day.draw_not_before = now
     db.commit()
     close_day(db, day.id, now)

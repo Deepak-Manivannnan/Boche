@@ -1,11 +1,11 @@
-# Wakes the Render app and applies due Draw day steps (seal at 8:00, OTP window from 8:15, publish at 8:30 PM IST).
+# Wakes the Render app and applies due Draw day steps (seal at 10:00, OTP window from 10:15, publish at 10:30 PM IST).
 # GitHub may start scheduled runs a few minutes late, so there is an early wake ping and a repeat after each step.
 name: Draw day ping
 
 on:
   schedule:
-    - cron: "25,30,45 14 * * *" # 19:55, 20:00, 20:15 IST
-    - cron: "0,5 15 * * *" # 20:30, 20:35 IST
+    - cron: "25,30,45 16 * * *" # 21:55, 22:00, 22:15 IST
+    - cron: "0,5 17 * * *" # 22:30, 22:35 IST
   workflow_dispatch:
 
 permissions: {}

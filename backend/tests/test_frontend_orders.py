@@ -47,7 +47,7 @@ def test_server_orders_become_the_prototypes_order_shape(make_client):
 
 def test_inclusion_and_claims_come_from_the_server(make_client):
     w = sealed_day(make_client)
-    won = {x["ticket"] for x in draw(w, 20, 40)["winners"]}
+    won = {x["ticket"] for x in draw(w, 22, 40)["winners"]}
     card = next(c for c in w.cards if won & set(c["numbers"]))
     claim = w.arun.post("/api/claims", json={"cardId": card["id"]}).json()
     orders = [run_adapter(o) for o in w.arun.get("/api/me/orders").json()]

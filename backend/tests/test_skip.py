@@ -1,5 +1,6 @@
 """Skip (ADR-0008): an Admin closes today's real Draw day early, so the Founder's OTP and the draw run
-straight away instead of waiting for 8:00 / 8:15 PM. The list is still sealed before its randomness exists."""
+straight away instead of waiting for 10:00 / 10:15 PM. The list is still sealed before its randomness
+exists."""
 
 import json
 from datetime import datetime, timedelta
@@ -91,7 +92,7 @@ def test_after_a_skip_the_otp_waits_for_the_round_then_the_draw_publishes_at_onc
     assert w.admin.post(f"/api/admin/draw-days/{DAY}/otp").status_code == 200
     run = w.admin.post(f"/api/admin/draw-days/{DAY}/run", json={"code": w.state.otp_sender.code})
     assert run.status_code == 200, run.text
-    assert run.json()["status"] == "published"  # well before 8:30 PM
+    assert run.json()["status"] == "published"  # well before 10:30 PM
 
     for name in ("tickets.csv", "seal.json", "result.json"):
         (tmp_path / name).write_bytes(w.admin.get(f"/api/public/days/{DAY}/{name}").content)
@@ -124,8 +125,8 @@ def test_a_day_can_only_be_skipped_once(w):
     assert res.status_code == 409 and "already closed" in res.json()["detail"]
 
 
-def test_a_day_already_sealed_at_8pm_cannot_be_skipped(w):
-    at(w.arun, 20, 0, 1)
+def test_a_day_already_sealed_at_10pm_cannot_be_skipped(w):
+    at(w.arun, 22, 0, 1)
     w.arun.post("/api/tick")
     assert admin_day(w)["status"] == "sealed"
     assert skip(w).status_code == 409

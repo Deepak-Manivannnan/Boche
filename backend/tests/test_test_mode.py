@@ -170,7 +170,7 @@ def test_a_real_days_otp_is_never_shown_on_screen(make_client):
     from draw_support import sealed_day
 
     w = sealed_day(make_client)
-    at(w.admin, 20, 16)
+    at(w.admin, 22, 16)
     assert "testCode" not in w.admin.post("/api/admin/draw-days/2026-11-10/otp").json()
 
 

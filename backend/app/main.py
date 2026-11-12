@@ -68,7 +68,7 @@ def create_app(
     @app.middleware("http")
     async def apply_due_steps(request: Request, call_next):
         """Before any API request, apply Draw day steps that are due (at most every 15 s; /api/tick runs
-        them itself). This is what closes Entries at 8 PM even if no scheduler fired."""
+        them itself). This is what closes Entries at 10 PM even if no scheduler fired."""
         path = request.url.path
         if path.startswith("/api/") and path not in ("/api/tick", "/api/health"):
             now, last = app.state.clock.now(), app.state.last_advance

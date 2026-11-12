@@ -12,13 +12,13 @@ from app.draw.drawrun import log_run
 from app.draw.lifecycle import close_day
 from engine import WINNER_COUNT
 
-ENTRIES_CLOSE = (20, 0)  # 8:00 PM IST: no Ticket can be added, removed or changed after this
-DRAW_FROM = (20, 15)  # 8:15 PM IST: the Randomness round is released; the draw may run
-PUBLISH_AT = (20, 30)  # 8:30 PM IST: results become visible (or straight after the draw, if later)
+ENTRIES_CLOSE = (22, 0)  # 10:00 PM IST: no Ticket can be added, removed or changed after this
+DRAW_FROM = (22, 15)  # 10:15 PM IST: the Randomness round is released; the draw may run
+PUBLISH_AT = (22, 30)  # 10:30 PM IST: results become visible (or straight after the draw, if later)
 
 
 def entry_day(now: datetime) -> date:
-    """The real Draw day an Entry made now belongs to: today before 8 PM IST, otherwise tomorrow."""
+    """The real Draw day an Entry made now belongs to: today before 10 PM IST, otherwise tomorrow."""
     today = ist_date(now)
     return today if now < ist_time(today, *ENTRIES_CLOSE) else today + timedelta(days=1)
 
@@ -62,7 +62,7 @@ def entry_draw_day(db: Session, now: datetime) -> m.DrawDay:
     return day
 
 
-# ---------------------------------------------------------------- Skip: today's draw now, not at 8:15 PM
+# ---------------------------------------------------------------- Skip: today's draw now, not at 10:15 PM
 
 
 class SkipRefused(Exception):
@@ -89,7 +89,7 @@ def can_skip(db: Session, day: m.DrawDay, now: datetime) -> bool:
 
 
 def skip_to_draw(db: Session, label: str, now: datetime) -> m.DrawDay:
-    """An Admin closes today's real Draw day now instead of at 8:00 PM, so its draw can run straight away.
+    """An Admin closes today's real Draw day now instead of at 10:00 PM, so its draw can run straight away.
 
     Same as a late seal (ADR-0002, ADR-0008): the Seal names a drand round at least 30 s in the future, so the
     Ticket list is still fixed before its randomness exists, and the Founder's OTP can be sent once that round
@@ -173,7 +173,7 @@ class DeleteRefused(Exception):
 
 
 def can_delete(day: m.DrawDay, now: datetime) -> bool:
-    """Today's real draw, once drawn, until 8:00 PM IST. Reopened later than that, it would close again at
+    """Today's real draw, once drawn, until 10:00 PM IST. Reopened later than that, it would close again at
     once with no Tickets and could never be drawn."""
     return (
         day.kind == "real"
@@ -186,7 +186,7 @@ def can_delete(day: m.DrawDay, now: datetime) -> bool:
 def delete_draw(db: Session, label: str, admin: m.User, now: datetime, publisher) -> m.DrawDay:
     """Erase today's completed draw and reopen the day empty: Winners, Claims, OTPs, the sealed list and its
     Seal on GitHub go; the entered cards go back to their owners to enter again. The day then runs as usual
-    (Skip, or close at 8:00 PM). The hash-chained run log keeps a "deleted" entry with what was erased."""
+    (Skip, or close at 10:00 PM). The hash-chained run log keeps a "deleted" entry with what was erased."""
     day = db.scalar(sa.select(m.DrawDay).where(m.DrawDay.label == label).with_for_update())
     if day is None:
         raise DeleteRefused(404, "No such Draw day")
@@ -195,7 +195,7 @@ def delete_draw(db: Session, label: str, admin: m.User, now: datetime, publisher
             raise DeleteRefused(409, "Only a real day's draw can be deleted")
         if day.status not in ("drawn", "published"):
             raise DeleteRefused(409, "This draw has not been run yet")
-        raise DeleteRefused(409, "Only today's draw can be deleted, before 8:00 PM")
+        raise DeleteRefused(409, "Only today's draw can be deleted, before 10:00 PM")
 
     if publisher is not None:  # first, so a GitHub failure changes nothing
         try:

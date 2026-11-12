@@ -56,12 +56,16 @@ A Draw day created on demand by an Admin to rehearse the full cycle; it never mi
 _Avoid_: Demo, sandbox
 
 **Entries close**:
-The moment (8:00 PM IST on a real Draw day, or earlier if an Admin uses **Skip**) after which no Ticket can be added, removed or changed for that day.
+The moment (10:00 PM IST on a real Draw day, or earlier if an Admin uses **Skip**) after which no Ticket can be added, removed or changed for that day. A real day that closes with fewer than 10 Tickets is **Carried**, not sealed.
 
 **Skip**:
-An Admin closing today's Entries early so its draw runs without waiting for 8:15 PM (ADR-0008). The Seal then names a Randomness round about 30 seconds ahead, and the result is published straight after the Draw run.
+An Admin closing today's Entries early so its draw runs without waiting for 10:15 PM (ADR-0008). The Seal then names a Randomness round about 30 seconds ahead, and the result is published straight after the Draw run.
 _Avoid_: Fast-forward, instant draw
 _Avoid_: Cut-off, lock
+
+**Carried**:
+A real Draw day that closed with fewer Tickets than Winners (10), so it was never sealed or drawn and nothing went to GitHub; its entered cards moved, still entered, into the next day's draw (ADR-0011).
+_Avoid_: Cancelled draw, rolled over
 
 **Seal**:
 A small public record, made when Entries close, naming the Draw day, its Ticket count, its Fingerprint and its Randomness round.
@@ -72,7 +76,7 @@ The SHA-256 hash of the Draw day's published Ticket list; any change to the list
 _Avoid_: Checksum, signature, root
 
 **Randomness round**:
-The single numbered drand value, released at 8:15 PM IST and named in the Seal before it exists, that supplies the draw's randomness.
+The single numbered drand value, released at 10:15 PM IST and named in the Seal before it exists, that supplies the draw's randomness.
 _Avoid_: Seed (the seed is derived from it), random number
 
 **Delete (a draw)**:
@@ -88,7 +92,7 @@ One of the ten Tickets picked by the draw. The first three picked win a **Main p
 _Avoid_: Winning number, lucky winner
 
 **Publish**:
-Making a Draw day's Winners visible to Customers and the public (8:30 PM IST, or right after the Draw run if later).
+Making a Draw day's Winners visible to Customers and the public (10:30 PM IST, or right after the Draw run if later).
 _Avoid_: Release, announce, approve
 
 ## Checking and claiming

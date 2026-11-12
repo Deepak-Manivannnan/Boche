@@ -41,8 +41,8 @@ class FakeDrand:
 
 
 def sealed_day(make_client, packs=2, single_cards=0):
-    """Arun enters `packs` x 1 kg (8 Tickets each) and `single_cards` x 250 g (1 Ticket each) before 8 PM;
-    the day is sealed at 8:00:01 PM IST."""
+    """Arun enters `packs` x 1 kg (8 Tickets each) and `single_cards` x 250 g (1 Ticket each) before 10 PM;
+    the day is sealed at 10:00:01 PM IST."""
     arun, admin = make_client("arun"), make_client("admin")
     state = admin.app.state
     state.otp_sender, state.drand_fetch, state.seal_publisher = FakeOtp(), FakeDrand(), None
@@ -54,12 +54,12 @@ def sealed_day(make_client, packs=2, single_cards=0):
             assert enter(arun, card["id"]).status_code == 200
             numbers += card["numbers"]
             cards.append(card)
-    at(arun, 20, 0, 1)
+    at(arun, 22, 0, 1)
     arun.post("/api/tick")
     return SimpleNamespace(arun=arun, admin=admin, state=state, numbers=numbers, cards=cards)
 
 
-def draw(w, hh=20, mm=16):
+def draw(w, hh=22, mm=16):
     """Request the Founder's OTP and run the draw at hh:mm IST."""
     at(w.admin, hh, mm)
     assert w.admin.post(f"/api/admin/draw-days/{DAY}/otp").status_code == 200

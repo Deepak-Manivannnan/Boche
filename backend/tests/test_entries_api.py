@@ -40,20 +40,20 @@ def ticket_rows(db_engine):
 # ---------------------------------------------------------------- which Draw day
 
 
-def test_an_entry_before_eight_pm_ist_goes_into_todays_draw(make_client, db_engine):
+def test_an_entry_before_ten_pm_ist_goes_into_todays_draw(make_client, db_engine):
     client = make_client()
     card = first_card(client)
-    at(client, 19, 59, 59)
+    at(client, 21, 59, 59)
     res = enter(client, card["id"])
     assert res.status_code == 200, res.text
     assert res.json()["drawDay"] == DAY
     assert {label for _, label in ticket_rows(db_engine).values()} == {DAY}
 
 
-def test_an_entry_at_eight_pm_ist_goes_into_tomorrows_draw(make_client):
+def test_an_entry_at_ten_pm_ist_goes_into_tomorrows_draw(make_client):
     client = make_client()
     card = first_card(client)
-    at(client, 20, 0, 0)
+    at(client, 22, 0, 0)
     assert enter(client, card["id"]).json()["drawDay"] == NEXT_DAY
 
 
@@ -71,13 +71,13 @@ def test_the_draw_day_carries_its_ist_schedule(make_client, db_engine):
     with db_engine.connect() as conn:
         day = conn.execute(sa.select(m.DrawDay).where(m.DrawDay.label == DAY)).one()
     assert (day.kind, day.status) == ("real", "open")
-    assert day.closes_at.replace(tzinfo=None) == datetime(2026, 11, 10, 14, 30)
-    assert day.draw_not_before.replace(tzinfo=None) == datetime(2026, 11, 10, 14, 45)
-    assert day.publish_not_before.replace(tzinfo=None) == datetime(2026, 11, 10, 15, 0)
+    assert day.closes_at.replace(tzinfo=None) == datetime(2026, 11, 10, 16, 30)
+    assert day.draw_not_before.replace(tzinfo=None) == datetime(2026, 11, 10, 16, 45)
+    assert day.publish_not_before.replace(tzinfo=None) == datetime(2026, 11, 10, 17, 0)
 
 
 def test_a_draw_day_closed_early_sends_new_entries_to_tomorrow(make_client, db_engine):
-    """Once today's list closes before 8 PM (an Admin's Skip), it never changes; new cards go to tomorrow."""
+    """Once today's list closes before 10 PM (an Admin's Skip), it never changes; new cards go to tomorrow."""
     client = make_client()
     at(client, 12, 0)
     enter(client, first_card(client)["id"])
@@ -97,10 +97,11 @@ def test_a_draw_day_closed_early_sends_new_entries_to_tomorrow(make_client, db_e
 
 def test_entering_the_same_card_twice_changes_nothing(make_client):
     client = make_client()
-    card = first_card(client)
+    card, other = buy(client, {"p1k": 2})["cards"]  # 16 lucky numbers: enough for the day to be drawn
     at(client, 12, 0)
     first = enter(client, card["id"]).json()
-    at(client, 20, 30)  # even after the cut-off, the card stays in the day it was entered into
+    enter(client, other["id"])
+    at(client, 22, 30)  # even after the cut-off, the card stays in the day it was entered into
     again = enter(client, card["id"])
     assert again.status_code == 200
     assert again.json() == first
@@ -154,10 +155,11 @@ def test_a_refunded_card_cannot_be_entered(make_client):
 
 def test_after_entries_close_a_refund_waits_for_the_results(make_client, db_engine):
     arun, admin = make_client("arun"), make_client("admin")
-    paid = buy(arun, {"p500": 1})
-    at(arun, 19, 0)
-    enter(arun, paid["cards"][0]["id"])
-    at(arun, 20, 0)
+    paid = buy(arun, {"p1k": 2})  # 16 lucky numbers: the day is sealed and drawn
+    at(arun, 21, 0)
+    for card in paid["cards"]:
+        enter(arun, card["id"])
+    at(arun, 22, 0)
     assert refund(admin, paid["id"]).status_code == 409
     assert {status for status, _ in ticket_rows(db_engine).values()} == {"issued"}
 
@@ -165,18 +167,18 @@ def test_after_entries_close_a_refund_waits_for_the_results(make_client, db_engi
 def test_a_refund_is_allowed_again_once_results_are_published(make_client, db_engine):
     arun, admin = make_client("arun"), make_client("admin")
     paid = buy(arun, {"p500": 1})
-    at(arun, 19, 0)
+    at(arun, 21, 0)
     enter(arun, paid["cards"][0]["id"])
     with db_engine.begin() as conn:
         conn.execute(sa.update(m.DrawDay).where(m.DrawDay.label == DAY).values(status="published"))
-    at(arun, 21, 0)
+    at(arun, 23, 0)
     assert refund(admin, paid["id"]).status_code == 200
 
 
 def test_an_order_holding_a_winning_ticket_can_never_be_refunded(make_client, db_engine):
     arun, admin = make_client("arun"), make_client("admin")
     paid = buy(arun, {"p500": 1})
-    at(arun, 19, 0)
+    at(arun, 21, 0)
     enter(arun, paid["cards"][0]["id"])
     winner = paid["cards"][0]["numbers"][1]
     with db_engine.begin() as conn:
@@ -189,17 +191,17 @@ def test_an_order_holding_a_winning_ticket_can_never_be_refunded(make_client, db
                 signature="bb" * 48,
                 seed="cc" * 32,
                 winners=[{"rank": 4, "prize": "consolation", "position": 1, "ticket": winner}],
-                created_at=datetime(2026, 11, 10, 14, 46, tzinfo=UTC),
+                created_at=datetime(2026, 11, 10, 16, 46, tzinfo=UTC),
             )
         )
-    at(arun, 21, 0)
+    at(arun, 23, 0)
     assert refund(admin, paid["id"]).status_code == 409
 
 
 def test_an_unentered_order_can_be_refunded_any_time(make_client, db_engine):
     arun, admin = make_client("arun"), make_client("admin")
     paid = buy(arun, {"p250": 1})
-    at(arun, 20, 45)
+    at(arun, 22, 45)
     assert refund(admin, paid["id"]).status_code == 200
     assert {status for status, _ in ticket_rows(db_engine).values()} == {"cancelled"}
 

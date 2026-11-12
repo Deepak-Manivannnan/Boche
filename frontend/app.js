@@ -1304,7 +1304,7 @@
   };
 
   /* ============================================================
-     LUCKY DRAW: scratch card per Tea order → submit number → daily 9 PM draw
+     LUCKY DRAW: scratch card per Tea order → submit number → daily 10 PM draw
      Prototype: shared localStorage stands in for the server.
      ============================================================ */
   function dayKey(d) { d = d || new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
@@ -1329,20 +1329,29 @@
     var cardOf = {}; allCards().forEach(function (x) { x.c.nos.forEach(function (no) { cardOf[no] = x.c; }); });
     return list.map(function (w, i) { var n = +w.rank || i + 1; return { card: cardOf[w.ticket] || null, place: n, rank: n + ({ 1: 'st', 2: 'nd', 3: 'rd' }[n] || 'th') + ' prize', amount: w.amount, no: w.ticket, name: w.name, mob: w.mobile, member: mine[w.ticket] ? BC_MEMBER.id : null }; });
   }
-  /* When a closed day's results go public: 8:30 PM IST, or right after the draw if an Admin ran it early (Skip) */
+  /* When a day's results go public: 10:30 PM IST, or right after the draw if an Admin ran it early (Skip) */
   function publishAt(key) {
     var d = (PUBLIC_DAYS || []).filter(function (x) { return x.label === key; })[0];
-    return d ? new Date(d.publishNotBefore) : new Date(key + 'T20:30:00+05:30');
+    return d ? new Date(d.publishNotBefore) : new Date(key + 'T' + BC_DRAW.publishTime + ':00+05:30');
+  }
+  /* No draw on this day: it closed with fewer lucky numbers than winners (the server marks it carried and moves
+     its cards to the next day), or nobody entered and the draw time has passed without a sealed list */
+  function noDrawOn(key) {
+    var d = (PUBLIC_DAYS || []).filter(function (x) { return x.label === key; })[0];
+    if (d) return d.status === 'carried';
+    var drawAt = new Date(key + 'T' + ('0' + BC_DRAW.drawHour).slice(-2) + ':15:00+05:30');
+    return PUBLIC_DAYS !== null && new Date() >= drawAt;
   }
   function resultsTimeLabel(key) { return istTime(publishAt(key).toISOString()).toUpperCase(); }
   function refreshResults(force) {
     if (!force && Date.now() - resultsAt < 15000) return Promise.resolve();
     resultsAt = Date.now();
-    var before = JSON.stringify(RESULTS);
+    function sig() { return JSON.stringify(RESULTS) + (PUBLIC_DAYS || []).map(function (d) { return d.label + d.status; }).join(); }
+    var before = sig();
     return BCAPI.get('/public/days').then(function (days) {
       var next = {}; days.forEach(function (d) { if (d.winners) next[d.label] = d.winners; });
       RESULTS = next; PUBLIC_DAYS = days;
-      if (JSON.stringify(RESULTS) !== before && (ORDER_SCREENS[parse().name] || parse().name === 'verify-draw') && parse().name !== 'scratch') rerender();
+      if (sig() !== before && (ORDER_SCREENS[parse().name] || parse().name === 'verify-draw') && parse().name !== 'scratch') rerender();
     }).catch(function () {});
   }
   /* Every tea pack bought = one scratch card; the card carries that pack's count of lucky numbers */
@@ -1571,6 +1580,7 @@
     var nosFor = function (pred) { return mine.filter(pred).reduce(function (t, c) { return t.concat(c.nos); }, []); };
     var todayNos = nosFor(function (c) { return c.submitted && c.drawDate === today; });
     var nextNos = nosFor(function (c) { return c.submitted && c.drawDate > today; });
+    var noDraw = !res && noDrawOn(today);
     function winners(list) {
       return '<div class="wl">' + list.map(function (w) {
         var me = w.member === BC_MEMBER.id, ord = w.place + ({ 1: 'st', 2: 'nd', 3: 'rd' }[w.place] || 'th');
@@ -1604,7 +1614,7 @@
       '<div class="cal-key"><span><i class="k-d"></i>Draw held</span><span><i class="k-w"></i>You won</span></div></div>' +
       (!sel ? '<p class="fine center" style="margin-top:10px">Tap a day to see its winners.</p>' :
       '<div class="sec-h" style="padding:0;margin:16px 0 8px"><h3>' + esc(dayLabel(sel)) + (sel === dayShift(today, -1) ? ' · ' + esc(new Date(sel + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })) : '') + '</h3><span class="li-s">' + (selRes ? selRes.length + ' winners' : 'No draw') + '</span></div>' +
-      (selRes ? winners(selRes) + verifyLink(sel) : '<div class="surface draw-wait"><div class="li-s">No published draw on this day.</div></div>'));
+      (selRes ? winners(selRes) + verifyLink(sel) : '<div class="surface draw-wait"><div class="li-s">' + (noDrawOn(sel) ? 'No draw on this day: fewer than ' + drawWinnerCount() + ' lucky numbers were entered.' : 'No published draw on this day.') + '</div></div>'));
     return topbar('Lucky Draw', 'home') + '<div class="pad">' +
       '<div class="draw-hero"><span class="hm-eyebrow">' + ic('gift', 14) + 'Every day at ' + drawTimeLabel() + '</span>' +
         '<div class="dh-top">' + inr(BC_DRAW.prizes[0].amount) + '</div><div class="dh-s">1st prize · ' + drawWinnerCount() + ' winners daily</div>' +
@@ -1619,6 +1629,8 @@
       }).join('') +
       '<div class="sec-h" style="padding:0;margin-top:22px"><h3>Today · ' + esc(new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })) + '</h3></div>' +
       (res ? wonCard(res) + winners(res) + verifyLink(today)
+        : noDraw ? '<div class="surface draw-wait"><div class="dw-k">Today’s draw</div><div class="dw-v sm">No draw today</div>' +
+          '<div class="li-s">Fewer than ' + drawWinnerCount() + ' lucky numbers were entered by ' + drawTimeLabel() + ', so today’s draw did not run. Entered cards move to tomorrow’s draw automatically.</div></div>'
         : '<div class="surface draw-wait"><div class="dw-k" id="drawCdK">Results in</div><div class="dw-v" id="drawCd"></div>' +
           '<div class="li-s">' + (todayNos.length ? 'Your ' + (todayNos.length > 1 ? todayNos.length + ' numbers' : 'number') + ' in today’s draw' : 'No entries from you yet. Order tea to get a scratch card.') + '</div>' +
           (todayNos.length ? '<div class="chips mt8">' + todayNos.map(function (no) { return '<span class="lno big">' + esc(no) + '</span>'; }).join('') + '</div>' : '') +
@@ -1634,7 +1646,8 @@
        it checks every 10 s (and at once when the tab is shown again, see below). New winners play the reveal. */
     timers.push(setInterval(function () { if (!document.hidden) refreshResults(true); }, 10000));
     var el = $('drawCd'); if (!el) return;
-    function tick() {   /* results are published at 8:30 PM IST, or right after an early (Skip) draw */
+    function tick() {   /* results are published at 10:30 PM IST, or right after an early (Skip) draw */
+      if (!RESULTS[dayKey()] && noDrawOn(dayKey())) { rerender(); return; }   /* no draw today: say so instead */
       var ms = publishAt(dayKey()) - new Date();
       if (ms <= 0) {
         el.textContent = 'Waiting for the draw to run'; el.classList.add('sm');
@@ -1675,7 +1688,7 @@
   var DRAND_CHAIN = '52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971';
   function verifyLink(label, inRow) { return '<a class="btn btn-line btn-sm' + (inRow ? '' : ' mt12') + '" href="/verify-draw/' + encodeURIComponent(label) + '">' + ic('shield', 15) + 'Verify this draw</a>'; }
   SCREENS['verify-draw'] = function (focus) {
-    var days = PUBLIC_DAYS, api = '/api/public/days/';
+    var days = PUBLIC_DAYS && PUBLIC_DAYS.filter(function (d) { return d.status !== 'carried'; }), api = '/api/public/days/';
     function dl(href, text) { return '<a class="link" href="' + esc(href) + '" target="_blank" rel="noopener">' + esc(text) + '</a>'; }
     function file(href, text) { return '<a class="link" href="' + esc(href) + '" download>' + esc(text) + '</a>'; }   /* our files download; external links open */
     var guide = '<div class="surface" style="padding:4px 16px"><div class="field-l" style="margin-top:12px">Check any draw yourself</div>' +
@@ -1683,7 +1696,7 @@
       '<li>Download ' + dl('/api/public/verifier/verify.py', 'verify.py') + ' (also on GitHub with the source).</li>' +
       '<li>Run <code>python verify.py 2026-11-10</code> with the draw day. It downloads the files below, the Seal from GitHub and the randomness from drand, re-runs the draw and prints <b>VERIFIED</b> or what failed.</li></ol></div>';
     var list = days === null ? '<div class="center mt16"><span class="mini-spin" aria-label="Loading"></span></div>'
-      : !days.length ? '<div class="surface sp-empty mt16">' + ic('calendar', 18) + '<span>No draw has closed yet. Each day closes at 8:00 PM IST.</span></div>'
+      : !days.length ? '<div class="surface sp-empty mt16">' + ic('calendar', 18) + '<span>No draw has closed yet. Each day closes at 10:00 PM IST.</span></div>'
       : days.map(function (d) {
         var pub = d.status === 'published', on = focus && focus === d.label;
         return '<div class="surface mt12' + (on ? ' vd-on' : '') + '" style="padding:4px 16px" id="vd-' + esc(d.label) + '">' +
@@ -1696,7 +1709,7 @@
           '<div class="kv"><span>Command</span><span><code>python verify.py ' + esc(d.label) + '</code></span></div></div>';
       }).join('');
     return topbar('Verify the draw', SES.authed ? 'draw' : 'welcome', ' ') + '<div class="pad">' +
-      '<p class="sub">Every night’s winners follow from two public things: the ticket list sealed at 8:00 PM and a random number from drand that nobody knew in advance. You can check both.</p>' +
+      '<p class="sub">Every night’s winners follow from two public things: the ticket list sealed at 10:00 PM and a random number from drand that nobody knew in advance. You can check both.</p>' +
       guide + '<div class="field-l">Draw days</div>' + list + '</div>';
   };
   AFTER['verify-draw'] = function (focus) {
@@ -1962,7 +1975,7 @@
   /* ----- Lucky Draw admin: Tonight's draw (status, Seal, Founder's OTP → the draw runs once) ----- */
   function istTime(iso, secs) { return iso ? new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', second: secs ? '2-digit' : undefined, timeZone: 'Asia/Kolkata' }) : '—'; }
   function prizeLabel(rank) { return rank === 1 ? '1st prize' : rank === 2 ? '2nd prize' : rank === 3 ? '3rd prize' : 'Lucky 7'; }
-  var ADM_STATUS = { open: ['Taking entries', 'plain'], sealed: ['Sealed · awaiting draw', 'warn'], drawn: ['Drawn', 'ok'], published: ['Published', 'ok'] };
+  var ADM_STATUS = { open: ['Taking entries', 'plain'], sealed: ['Sealed · awaiting draw', 'warn'], drawn: ['Drawn', 'ok'], published: ['Published', 'ok'], carried: ['No draw · moved on', 'plain'] };
   function admDay() { var A = ui.adm; return A && A.days ? A.days.filter(function (d) { return d.label === A.sel; })[0] : null; }
   function admLoad() {
     var A = ui.adm = ui.adm || { days: null, sel: null, loadedAt: 0 };
@@ -1992,14 +2005,14 @@
     var st = ADM_STATUS[d.status] || [d.status, 'plain'], body;
     var seeding = d.seeding && d.seeding.running ? d.seeding : null;
     if (d.status === 'open' && d.kind === 'test') body = '<div class="btn-row mt16"><button class="btn btn-line" data-act="admSeed"' + (seeding ? ' disabled' : '') + '>' + (seeding ? 'Adding… ' + num(seeding.done) + ' / ' + num(seeding.target) : 'Add 5,000 tickets') + '</button>' +
-      '<button class="btn btn-gold" data-act="admClose"' + (seeding || !d.ticketCount ? ' disabled' : '') + '>Close entries now</button></div>' +
-      '<p class="fine center">Tickets are bought by 20 test customers through the real paid-order path. Closing seals the list and picks a drand round about 30 s ahead.</p>';
-    else if (d.status === 'open') body = '<div class="rule-note mt16">' + ic('clock', 16) + '<span>Entries close at ' + istTime(d.closesAt) + '. The ticket list is then sealed automatically.</span></div>' +
+      '<button class="btn btn-gold" data-act="admClose"' + (seeding || (d.ticketCount || 0) < 10 ? ' disabled' : '') + '>Close entries now</button></div>' +
+      '<p class="fine center">Tickets are bought by 20 test customers through the real paid-order path. Closing (at least 10 tickets) seals the list and picks a drand round about 30 s ahead.</p>';
+    else if (d.status === 'open') body = '<div class="rule-note mt16">' + ic('clock', 16) + '<span>Entries close at ' + istTime(d.closesAt) + '. The ticket list is then sealed automatically, if it has at least 10 tickets; with fewer there is no draw and the entered cards move to the next day.</span></div>' +
       (!d.canSkip ? (d.kind === 'real' && d.label === dayKey() && (d.ticketCount || 0) < 10 ? '<p class="fine center mt12">Skip the wait appears once today has at least 10 tickets (one per winner).</p>' : '') : A.skipArm === d.label
         ? '<div class="rule-note mt16">' + ic('shield', 16) + '<span>Close today’s entries now? The ' + num(d.ticketCount || 0) + ' tickets entered so far are sealed and drawn; cards entered after this go into tomorrow’s draw. This cannot be undone.</span></div>' +
           '<div class="btn-row mt12"><button class="btn btn-line" data-act="admSkipCancel">Cancel</button><button class="btn btn-gold" data-act="admSkip">Yes, close and draw now</button></div>'
         : '<button class="btn btn-gold mt16" data-act="admSkipArm">' + ic('sparkle', 16) + 'Skip the wait · draw now</button>' +
-          '<p class="fine center">Seals today’s list now instead of at 8:00 PM. The founder’s OTP can be sent about 30 s later, and results go public as soon as the draw runs.</p>') +
+          '<p class="fine center">Seals today’s list now instead of at 10:00 PM. The founder’s OTP can be sent about 30 s later, and results go public as soon as the draw runs.</p>') +
       /* Reset entries (demos): every entered card goes back to its owner to be entered again; first tap only asks */
       (!d.canReset ? '' : A.resetArm === d.label
         ? '<div class="rule-note mt16">' + ic('shield', 16) + '<span>Reset this draw’s entries? The ' + num(d.cardCount || 0) + ' scratch cards (' + num(d.ticketCount || 0) + ' lucky numbers) go back to their owners, ready to enter again. Nothing is drawn or deleted.</span></div>' +
@@ -2012,11 +2025,13 @@
     else if (d.status === 'sealed') body = '<div class="field-l">Founder’s OTP</div><div class="otp" id="otp">' + otpBoxes(4) + '</div><div class="err-text" id="otpErr"></div>' +
       '<button class="btn btn-gold mt16" data-otp-btn data-act="admRun" disabled>' + ic('sparkle', 16) + 'Run the draw</button>' +
       '<p class="fine center mt12">Code sent · valid until ' + istTime(d.otpExpiresAt) + ' · <a class="link" href="javascript:void(0)" data-act="admSendOtp">Send a new code</a></p>';
+    else if (d.status === 'carried') body = '<div class="rule-note mt16">' + ic('calendar', 16) + '<span>No draw: fewer than 10 lucky numbers were entered by ' + istTime(d.closesAt) + '. Nothing was sealed or sent to GitHub.' +
+      (d.carried && d.carried.cards ? ' ' + (d.carried.cards === 1 ? 'The 1 entered scratch card (' : 'The ' + num(d.carried.cards) + ' entered scratch cards (') + num(d.carried.tickets) + ' lucky numbers) moved to the ' + esc(d.carried.to) + ' draw, where Reset entries can give them back to their owners.' : '') + '</span></div>';
     else body = '<div class="field-l">Winners · drawn at ' + istTime(d.drawnAt, true) + '</div><div class="list">' + (d.winners || []).map(function (x) {
         return '<div class="li win"><div class="li-main"><div class="li-t">' + x.rank + ({ 1: 'st', 2: 'nd', 3: 'rd' }[x.rank] || 'th') + ' prize</div><div class="li-s">Position ' + x.position + ' in the list</div></div><div class="win-r"><span class="lno">' + esc(x.ticket) + '</span></div></div>';
       }).join('') + '</div><p class="fine center mt12">Results go public at ' + istTime(d.publishNotBefore) + '.</p>' +
       (!d.canDelete ? '' : A.delArm === d.label
-        ? '<div class="rule-note mt16">' + ic('shield', 16) + '<span>Delete today’s draw? The winners, their claims and the sealed list are erased, and the ' + num(d.ticketCount || 0) + ' tickets go back to their owners to enter again. Today’s draw reopens empty and closes at 8:00 PM. This cannot be undone.</span></div>' +
+        ? '<div class="rule-note mt16">' + ic('shield', 16) + '<span>Delete today’s draw? The winners, their claims and the sealed list are erased, and the ' + num(d.ticketCount || 0) + ' tickets go back to their owners to enter again. Today’s draw reopens empty and closes at 10:00 PM. This cannot be undone.</span></div>' +
           '<div class="btn-row mt12"><button class="btn btn-line" data-act="admDelCancel">Cancel</button><button class="btn btn-gold" data-act="admDel">Yes, delete this draw</button></div>'
         : '<button class="btn btn-line mt16" data-act="admDelArm">' + ic('x', 16) + 'Delete this draw</button>');
     return head + '<div class="pad"><div class="field-l" style="margin-top:16px">Draw day</div><div class="chips scroll-x">' + A.days.map(function (x) {
@@ -2531,7 +2546,7 @@
       ui.sheetLock = true;
       openSheet('<h3>Entering the Lucky Draw</h3><p class="lead">' + numsLabel(c.nos.length) + '</p><ul class="steps" id="drawSteps">' +
         ['Sending ' + (c.nos.length > 1 ? 'your numbers' : 'your number') + ' to Boche', 'Checking it’s valid and unused', 'Entry confirmed'].map(function (s) { return '<li><span class="st"></span>' + esc(s) + '</li>'; }).join('') + '</ul>');
-      /* The server decides the Draw day by its own IST clock (before 8 PM: today; after: tomorrow) */
+      /* The server decides the Draw day by its own IST clock (before 10 PM: today; after: tomorrow) */
       var entry = BCAPI.post('/draw/entries', { cardId: c.id });
       var shown = new Promise(function (res) { runSteps($('drawSteps').children, res, 550); });
       Promise.all([entry, shown]).then(function (r) {
