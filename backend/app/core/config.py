@@ -1,6 +1,7 @@
 """Settings come only from environment variables. A local .env file is read in development."""
 
 import os
+import re
 import secrets
 import sys
 from dataclasses import dataclass
@@ -43,6 +44,9 @@ class Settings:
     msg91_template_id: str = ""
     msg91_otp_variable: str = "OTP"
     otp_expiry_minutes: int = 10
+    # 10-digit mobiles allowed to act as Admin (ADMIN_MOBILES). Set in the Render dashboard, never committed:
+    # the repository is public and these are personal numbers.
+    admin_mobiles: frozenset[str] = frozenset()
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -54,6 +58,7 @@ class Settings:
             admin_emails=frozenset(
                 e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()
             ),
+            admin_mobiles=admin_mobiles(os.environ.get("ADMIN_MOBILES", "")),
             cookie_secure=os.environ.get("COOKIE_SECURE", "false").strip().lower() == "true",
             payment_secret=_secret("PAYMENT_WEBHOOK_SECRET"),
             seals_repo=os.environ.get("SEALS_REPO", "").strip(),
@@ -65,6 +70,24 @@ class Settings:
             msg91_otp_variable=os.environ.get("MSG91_OTP_VARIABLE", "OTP").strip() or "OTP",
             otp_expiry_minutes=int(os.environ.get("OTP_EXPIRY_MINUTES", "10") or 10),
         )
+
+
+def admin_mobiles(raw: str) -> frozenset[str]:
+    """'+91 98470 00001, 9847000002' -> {'9847000001', '9847000002'}. Entries that are not valid Indian
+    mobile numbers are left out (and reported), so a typo never matches anyone."""
+    out = set()
+    for entry in raw.split(","):
+        digits = re.sub(r"\D", "", entry)
+        if len(digits) == 12 and digits.startswith("91"):
+            digits = digits[2:]
+        if re.fullmatch(r"[6-9]\d{9}", digits):
+            out.add(digits)
+        elif entry.strip():
+            print(
+                "WARNING: an ADMIN_MOBILES entry is not a valid Indian mobile number; ignored",
+                file=sys.stderr,
+            )
+    return frozenset(out)
 
 
 def _secret(name: str) -> str:

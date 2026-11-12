@@ -69,6 +69,9 @@ def test_the_admin_api_offers_no_way_to_edit_or_reject_winners(w):
         ("/api/admin/draw-days/{label}/skip", ("POST",)),  # closes today's entries early; draws nothing
         ("/api/admin/draw-days/{label}/delete", ("POST",)),  # erases today's whole draw (ADR-0009)
         ("/api/admin/draw-days/{label}/reset-entries", ("POST",)),  # entered cards back to their owners
+        # Admin sign-in with a mobile number on ADMIN_MOBILES (codes go to listed numbers only)
+        ("/api/auth/admin/otp/send", ("POST",)),
+        ("/api/auth/admin/otp/verify", ("POST",)),
         ("/api/admin/draw-days/{label}/otp", ("POST",)),
         ("/api/admin/draw-days/{label}/run", ("POST",)),
         ("/api/admin/orders/{order_id}/refund", ("POST",)),

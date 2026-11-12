@@ -21,10 +21,26 @@ def current_user(request: Request, db: Session) -> m.User:
     return user
 
 
+def is_admin(user: m.User, settings) -> bool:
+    """On the server's Admin lists right now: the Google email in ADMIN_EMAILS, or the verified mobile
+    number in ADMIN_MOBILES. Re-read on every request, so taking someone off a list ends their access."""
+    by_email = user.email is not None and user.email in settings.admin_emails
+    by_mobile = (
+        user.mobile is not None
+        and user.mobile_verified_at is not None
+        and user.mobile in settings.admin_mobiles
+    )
+    return by_email or by_mobile
+
+
+def role_for(user: m.User, settings) -> str:
+    return "admin" if is_admin(user, settings) else "customer"
+
+
 def require_admin(request: Request, db: Session) -> m.User:
-    """An Admin is a signed-in user whose email is on the server's Admin list right now."""
+    """An Admin is a signed-in user who is on the server's Admin lists right now."""
     user = current_user(request, db)
-    if user.role != "admin" or user.email not in request.app.state.settings.admin_emails:
+    if user.role != "admin" or not is_admin(user, request.app.state.settings):
         raise HTTPException(status_code=403, detail="Admins only")
     return user
 

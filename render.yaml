@@ -29,6 +29,10 @@ services:
       # Who may act as Admin (comma-separated). Re-read at every sign-in.
       - key: ADMIN_EMAILS
         value: deepakmanivannnan@gmail.com
+      # Admin mobile numbers (comma-separated) that may sign in to the admin page with an SMS code. Codes go
+      # only to these numbers. Personal data and this repository is public: set it in the dashboard only.
+      - key: ADMIN_MOBILES
+        sync: false
       # Public GitHub repository that receives each day's Seal at 8 PM (ADR-0003).
       - key: SEALS_REPO
         value: Deepak-Manivannnan/boche-draw-seals

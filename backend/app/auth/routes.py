@@ -10,6 +10,7 @@ Two ways in:
 A number belongs to one account: a Google sign-up with a number already registered is refused straight away.
 Accounts made before this (Google only, no number) keep signing in with Google as they always did."""
 
+import logging
 from typing import Annotated
 
 import sqlalchemy as sa
@@ -20,11 +21,13 @@ from sqlalchemy.orm import Session
 
 from app.auth.google import AuthError, AuthUnavailable
 from app.auth.mobile import check_code, mobile_taken, normalise_mobile, send_code
-from app.core.deps import current_user, get_db, user_json
+from app.core.deps import current_user, get_db, role_for, user_json
+from app.core.deps import is_admin as is_admin_user
 from app.db import models as m
 from app.draw.otp import OtpRefused
 from app.shop.routes import Delivery
 
+log = logging.getLogger("boche.auth")
 router = APIRouter(prefix="/api")
 Db = Annotated[Session, Depends(get_db)]
 TAKEN = "This mobile number is already registered. Please use a different number."
@@ -100,15 +103,16 @@ def public_config(request: Request) -> dict:
 @router.post("/auth/google")
 def sign_in_with_google(body: GoogleSignIn, request: Request, response: Response, db: Db) -> dict:
     who = _google(request, body.credential)
-    is_admin = who.email in request.app.state.settings.admin_emails
-    if body.admin and not is_admin:
-        # Staff page: no customer account or session is created for someone who is not an Admin.
-        raise HTTPException(status_code=403, detail="This Google account is not a Lucky Draw admin")
-
+    settings = request.app.state.settings
     # Match on Google's stable account id; an existing row with the same verified email is the same person.
     user = db.scalar(sa.select(m.User).where(m.User.google_sub == who.sub))
     if user is None:
         user = db.scalar(sa.select(m.User).where(m.User.email == who.email))
+    # An Admin by email, or an account whose verified mobile number is on the Admin list
+    is_admin = who.email in settings.admin_emails or (user is not None and is_admin_user(user, settings))
+    if body.admin and not is_admin:
+        # Staff page: no customer account or session is created for someone who is not an Admin.
+        raise HTTPException(status_code=403, detail="This Google account is not a Lucky Draw admin")
     if user is None and not is_admin:
         # A new customer: verify a mobile number and create the profile first; no account exists yet.
         pending = {
@@ -122,8 +126,8 @@ def sign_in_with_google(body: GoogleSignIn, request: Request, response: Response
     # The name is the customer's own (editable in the profile), so Google no longer overwrites it.
     user.google_sub, user.email = who.sub, who.email
     user.picture = _photo(who.picture)  # refreshed so a changed Google photo shows
-    # The Admin list is server configuration, re-read at every sign-in so removal takes effect.
-    user.role = "admin" if is_admin else "customer"
+    # The Admin lists are server configuration, re-read at every sign-in (and every admin request).
+    user.role = role_for(user, settings)
     db.commit()
     return _signed_in(request, response, user)
 
@@ -160,10 +164,66 @@ def verify_sign_in_code(body: CodeIn, request: Request, response: Response, db: 
         return _signup_state(pending)
     user = db.scalar(sa.select(m.User).where(m.User.mobile == mobile))
     if user is not None:  # a registered number signs in
+        user.role = role_for(user, state.settings)
+        db.commit()
         return _signed_in(request, response, user)
     pending = {"m": mobile}  # a new number: create the profile
     state.pending_signups.issue(response, pending)
     return _signup_state(pending)
+
+
+# ---------------------------------------------------------------- Admins: mobile number + SMS code
+# Codes go only to numbers on ADMIN_MOBILES. Any other number is refused before a code is made or an SMS is
+# sent, and refusals from one connection are limited too, so the list can't be probed by trying numbers.
+
+ADMIN_REFUSALS_PER_HOUR = 10
+
+
+def _admin_number(request: Request, raw: str) -> str:
+    state = request.app.state
+    mobile = normalise_mobile(raw)
+    if mobile in state.settings.admin_mobiles:
+        return mobile
+    ip = request.client.host if request.client else ""
+    now = state.clock.now()
+    recent = [t for t in state.admin_refusals.get(ip, []) if (now - t).total_seconds() < 3600]
+    state.admin_refusals[ip] = recent + [now]
+    log.warning("admin sign-in refused for a number not on ADMIN_MOBILES (ending %s)", mobile[-4:])
+    if len(recent) >= ADMIN_REFUSALS_PER_HOUR:
+        raise OtpRefused(429, "Too many attempts. Try again later.")
+    raise OtpRefused(403, "This number is not an admin number")
+
+
+@router.post("/auth/admin/otp/send")
+def send_admin_code(body: MobileIn, request: Request, db: Db) -> dict:
+    state = request.app.state
+    try:
+        mobile = _admin_number(request, body.mobile)  # refused before any code exists or SMS goes out
+        ip = request.client.host if request.client else ""
+        send_code(db, mobile, ip, state.clock.now(), state.login_sms_sender)
+    except OtpRefused as e:
+        raise _refused(e) from e
+    return {"sent": True, "mobile": mobile}
+
+
+@router.post("/auth/admin/otp/verify")
+def verify_admin_code(body: CodeIn, request: Request, response: Response, db: Db) -> dict:
+    state = request.app.state
+    try:
+        mobile = _admin_number(request, body.mobile)  # checked again: the list may have changed meanwhile
+        check_code(db, mobile, body.code, state.clock.now())
+    except OtpRefused as e:
+        raise _refused(e) from e
+    now = state.clock.now()
+    user = db.scalar(sa.select(m.User).where(m.User.mobile == mobile))
+    if user is None:  # the Admin's first sign-in with this number: an account for it (name editable)
+        user = m.User(name="Admin", mobile=mobile, mobile_verified_at=now, created_at=now)
+        db.add(user)
+    user.mobile_verified_at = user.mobile_verified_at or now
+    user.role = "admin"
+    db.commit()
+    log.warning("admin signed in with mobile number ending %s (user %s)", mobile[-4:], user.id)
+    return _signed_in(request, response, user)
 
 
 @router.get("/auth/signup")
@@ -206,6 +266,7 @@ def create_profile(body: NewProfile, request: Request, response: Response, db: D
         role="customer",
         created_at=now,
     )
+    user.role = role_for(user, state.settings)  # an Admin's own number made through sign-up is an Admin too
     db.add(user)
     try:
         db.flush()

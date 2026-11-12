@@ -1917,24 +1917,33 @@
   /* ============================================================
      BUSINESS ADMIN MODULE (staff)
      ============================================================ */
+  /* Admin sign-in: Google (ADMIN_EMAILS) or an admin mobile number (ADMIN_MOBILES) with an SMS code. The server
+     sends a code only to a listed number; any other number is refused and nothing is sent. */
   SCREENS.staff = function () {
-    var hint = BC_STAFF.map(function (s) { return '<div>' + esc(s.name) + ' · ' + esc(biz(s.biz).name) + ' — <b>' + esc(s.mobile) + '</b></div>'; }).join('');
-    return topbar('', 'welcome') + '<div class="auth"><span class="badge">' + ic('scan', 13) + ' Boche business app</span>' +
-      '<h1 class="mt12">Business sign-in</h1><p class="lead">For staff at Boche venues. Verify members, check them in and post bills.</p>' +
-      '<div class="field-l">Lucky Draw admin</div>' +
-      (ME && ME.role === 'admin'
-        ? '<button class="btn btn-gold" data-go="admin-draw">' + ic('crown', 16) + 'Open Tonight’s draw</button>'
-        : '<div class="gsi-slot" id="gsiAdmin"><span class="mini-spin" aria-label="Loading Google sign-in"></span></div>' +
-          '<div class="err-text" id="adminErr">' + esc(ui.adminErr || '') + '</div>') +
-      '<div class="field-l">Venue staff mobile number</div>' +
-      '<div class="phone-field"><span class="cc">+91</span><input id="smobile" type="tel" inputmode="numeric" maxlength="10" placeholder="10-digit number" value="' + esc(ui.staffMobile) + '"></div>' +
-      '<div class="err-text" id="smobErr"></div>' +
-      '<button class="btn btn-gold mt8" id="sendStaffOtp" data-act="sendStaffOtp" disabled>Send OTP</button>' +
-      '<div class="demo-hint">Demo staff<br>' + hint + '</div></div>';
+    var signedIn = ME && ME.role === 'admin', S2 = ui.admAuth || {}, sent = !!S2.sent;
+    return topbar('', 'welcome') + '<div class="auth"><span class="badge">' + ic('crown', 13) + ' Lucky Draw admin</span>' +
+      '<h1 class="mt12">Admin sign-in</h1><p class="lead">For Lucky Draw admins only. Sign in with your admin Google account or your admin mobile number.</p>' +
+      (signedIn
+        ? '<button class="btn btn-gold mt16" data-go="admin-draw">' + ic('crown', 16) + 'Open Tonight’s draw</button>'
+        : '<div class="gsi-slot mt16" id="gsiAdmin"><span class="mini-spin" aria-label="Loading Google sign-in"></span></div>' +
+          '<div class="err-text" id="adminErr">' + esc(ui.adminErr || '') + '</div>' +
+          '<div class="wl-or">or</div>' +
+          '<div class="field-l">Login with admin mobile number</div>' +
+          '<div class="phone-field' + (sent ? ' is-sent' : '') + '"><span class="cc">+91</span><input id="smobile" type="tel" inputmode="numeric" maxlength="10" placeholder="10-digit admin number" autocomplete="tel-national" value="' + esc(ui.staffMobile || '') + '"' + (sent ? ' readonly' : '') + '>' +
+            (sent ? '<button class="link mob-change" data-act="admChangeNumber">Change</button>' : '') + '</div>' +
+          '<div class="err-text" id="smobErr"></div>' +
+          (sent
+            ? '<div class="field-l" style="margin-top:20px">Enter the 4-digit code sent by SMS</div>' +
+              '<div class="otp" id="otp">' + otpBoxes(4) + '</div><div class="err-text" id="otpErr"></div>' +
+              '<button class="btn btn-gold mt16" data-otp-btn data-act="admVerifyCode" disabled>Verify & sign in</button>' +
+              '<p class="fine center mt16" id="resend"></p>'
+            : '<button class="btn btn-gold mt8" id="sendAdmCode" data-act="admSendCode" disabled>Send code</button>')) + '</div>';
   };
   AFTER.staff = function () {
-    wireMobile('smobile', 'sendStaffOtp', 'smobErr', function () { ACTIONS.sendStaffOtp(); }, true);
     if ($('gsiAdmin')) mountGoogleButton('gsiAdmin', 'adminErr', onAdminCredential);
+    if ($('otp')) wireOtp(function () { ACTIONS.admVerifyCode(); }, 60, true);   /* submitted with the button only */
+    else if ($('smobile')) wireMobile('smobile', 'sendAdmCode', 'smobErr', function () { ACTIONS.admSendCode(); }, true);
+    var A2 = ui.admAuth; if (A2 && A2.err && $('smobErr')) { $('smobErr').textContent = A2.err; A2.err = ''; }
   };
   /* Lucky Draw admin: Google sign-in; only emails on the server's Admin list get the admin role */
   function onAdminCredential(resp) {
@@ -1974,7 +1983,7 @@
   }
   SCREENS['admin-draw'] = function () {
     var A = ui.adm, d = admDay();
-    var head = '<div class="staff-head"><span class="ca-ic">' + ic('crown', 22) + '</span><div class="li-main"><div class="ca-t">Lucky Draw admin</div><div class="ca-s">' + esc(ME ? ME.name + ' · ' + ME.email : '') + '</div></div>' +
+    var head = '<div class="staff-head"><span class="ca-ic">' + ic('crown', 22) + '</span><div class="li-main"><div class="ca-t">Lucky Draw admin</div><div class="ca-s">' + esc(ME ? ME.name + ' · ' + (ME.email || '+91 ' + fmtMobile(ME.mobile || '')) : '') + '</div></div>' +
       '<button class="iconbtn" data-act="logout" aria-label="Sign out">' + ic('logout') + '</button></div>';
     if (!A || !A.days) return head + '<div class="pad center mt24"><span class="mini-spin" aria-label="Loading"></span></div>';
     var testPanel = '<div class="field-l">Test mode</div><div class="surface" style="padding:12px 16px"><p class="fine" style="margin-top:0">Run a whole day now: seed tickets, close entries, send the OTP and draw. Test days are labelled TEST and never touch real draws.</p>' +
@@ -2182,8 +2191,9 @@
       go('staff-otp');
     },
     resendOtp: function () {
-      if (parse().name !== 'mobile') { toast('OTP resent'); rerender(); return; }   /* the staff demo screen */
-      BCAPI.post('/auth/otp/send', { mobile: ui.mobile }).then(function () { toast('New code sent'); rerender(); },
+      var adminPage = parse().name === 'staff';
+      if (parse().name !== 'mobile' && !adminPage) { toast('OTP resent'); rerender(); return; }   /* the staff demo screen */
+      BCAPI.post(adminPage ? '/auth/admin/otp/send' : '/auth/otp/send', { mobile: adminPage ? ui.staffMobile : ui.mobile }).then(function () { toast('New code sent'); rerender(); },
         function (e) { var el = $('otpErr'); if (el) el.textContent = e.message || 'Could not send a new code'; });
     },
     verifyOtp: function () {
@@ -2212,6 +2222,31 @@
     },
     staffOutlet: function (el) { SES.outlet = el.dataset.id; saveSes(); rerender(); },
     staffLogout: function () { SES.staffId = null; saveSes(); ui.staffMobile = ''; go('welcome'); },
+    /* ----- Admin sign-in with an admin mobile number ----- */
+    admSendCode: function () {
+      var A2 = ui.admAuth = ui.admAuth || {};
+      if (!/^[6-9]\d{9}$/.test(ui.staffMobile || '') || A2.busy) return;
+      A2.busy = true;
+      BCAPI.post('/auth/admin/otp/send', { mobile: ui.staffMobile }).then(function () {
+        A2.busy = false; A2.sent = true; rerender(); toast('Code sent to +91 ' + fmtMobile(ui.staffMobile));
+      }, function (e) { A2.busy = false; var el = $('smobErr'); if (el) el.textContent = e.message || 'Could not send the code. Try again.'; });
+    },
+    admChangeNumber: function () { if (ui.admAuth) ui.admAuth.sent = false; rerender(); var i = $('smobile'); if (i) { i.focus(); i.select(); } },
+    admVerifyCode: function () {
+      var A2 = ui.admAuth = ui.admAuth || {};
+      var code = Array.prototype.map.call($('otp').querySelectorAll('input'), function (x) { return x.value; }).join('');
+      if (!/^\d{4}$/.test(code) || A2.busy) return;
+      A2.busy = true;
+      BCAPI.post('/auth/admin/otp/verify', { mobile: ui.staffMobile, code: code }).then(function (u) {
+        A2.busy = false; ui.admAuth = null; ui.staffMobile = '';
+        ME = u; applyProfile(); SES.authed = true; SES.pending = null; saveSes(); refreshOrders(true);
+        ui.adm = null; go('admin-draw');
+      }, function (e) {
+        A2.busy = false;
+        if (e.status === 403) { A2.sent = false; A2.err = e.message; rerender(); return; }   /* no longer an admin number */
+        $('otpErr').textContent = e.message || 'Could not check the code. Try again.'; otpFail();
+      });
+    },
     admPick: function (el) { ui.adm.sel = el.dataset.id; ui.adm.skipArm = ui.adm.delArm = ui.adm.resetArm = null; rerender(); },
     admResetArm: function () { var d = admDay(); if (d && d.canReset) { ui.adm.resetArm = d.label; ui.adm.skipArm = null; rerender(); } },
     admResetCancel: function () { ui.adm.resetArm = null; rerender(); },

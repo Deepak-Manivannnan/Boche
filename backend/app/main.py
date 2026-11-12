@@ -62,6 +62,7 @@ def create_app(
     )
     app.state.login_sms_sender = app.state.otp_sender  # sign-in codes go out the same way (MSG91 or the log)
     app.state.pending_signups = PendingSignups(settings.session_secret, settings.cookie_secure, clock)
+    app.state.admin_refusals = {}  # connection -> times an admin code was refused (numbers not on the list)
     app.state.drand_fetch = fetch_round
 
     @app.middleware("http")
