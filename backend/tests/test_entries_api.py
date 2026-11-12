@@ -76,13 +76,20 @@ def test_the_draw_day_carries_its_ist_schedule(make_client, db_engine):
     assert day.publish_not_before.replace(tzinfo=None) == datetime(2026, 11, 10, 15, 0)
 
 
-def test_a_draw_day_that_is_no_longer_open_refuses_entries(make_client, db_engine):
+def test_a_draw_day_closed_early_sends_new_entries_to_tomorrow(make_client, db_engine):
+    """Once today's list closes before 8 PM (an Admin's Skip), it never changes; new cards go to tomorrow."""
     client = make_client()
     at(client, 12, 0)
     enter(client, first_card(client)["id"])
     with db_engine.begin() as conn:
         conn.execute(sa.update(m.DrawDay).where(m.DrawDay.label == DAY).values(status="sealed"))
-    assert enter(client, first_card(client)["id"]).status_code == 409
+    res = enter(client, first_card(client)["id"])
+    assert res.status_code == 200, res.text
+    assert res.json()["drawDay"] == "2026-11-11"
+    with db_engine.connect() as conn:
+        today = conn.scalar(sa.select(m.DrawDay.id).where(m.DrawDay.label == DAY))
+        cards = sa.select(sa.func.count()).select_from(m.Card).where(m.Card.draw_day_id == today)
+        assert conn.scalar(cards) == 1
 
 
 # ---------------------------------------------------------------- who and how often

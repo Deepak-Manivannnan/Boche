@@ -893,7 +893,7 @@
     if (!c.submitted) return { t: 'Not entered yet', go: 'scratch/' + c.id, cta: 'Enter' };
     var res = drawResults(c.drawDate);
     if (!res) return { t: c.included === false ? 'Not in ' + dayLabel(c.drawDate).toLowerCase() + '’s sealed list'
-      : c.included ? 'In ' + dayLabel(c.drawDate).toLowerCase() + '’s sealed list · results 8:30 PM'
+      : c.included ? 'In ' + dayLabel(c.drawDate).toLowerCase() + '’s sealed list · results ' + resultsTimeLabel(c.drawDate)
       : 'In ' + dayLabel(c.drawDate).toLowerCase() + '’s draw · ' + drawTimeLabel() };
     var won = res.filter(function (w) { return c.nos.indexOf(w.no) > -1; });
     if (!won.length) return { t: dayLabel(c.drawDate) + '’s draw · no win this time' };
@@ -1244,6 +1244,12 @@
     var cardOf = {}; allCards().forEach(function (x) { x.c.nos.forEach(function (no) { cardOf[no] = x.c; }); });
     return list.map(function (w, i) { var n = +w.rank || i + 1; return { card: cardOf[w.ticket] || null, place: n, rank: n + ({ 1: 'st', 2: 'nd', 3: 'rd' }[n] || 'th') + ' prize', amount: w.amount, no: w.ticket, name: w.name, mob: w.mobile, member: mine[w.ticket] ? BC_MEMBER.id : null }; });
   }
+  /* When a closed day's results go public: 8:30 PM IST, or right after the draw if an Admin ran it early (Skip) */
+  function publishAt(key) {
+    var d = (PUBLIC_DAYS || []).filter(function (x) { return x.label === key; })[0];
+    return d ? new Date(d.publishNotBefore) : new Date(key + 'T20:30:00+05:30');
+  }
+  function resultsTimeLabel(key) { return istTime(publishAt(key).toISOString()).toUpperCase(); }
   function refreshResults(force) {
     if (!force && Date.now() - resultsAt < 15000) return Promise.resolve();
     resultsAt = Date.now();
@@ -1491,9 +1497,10 @@
     refreshResults();
     maybeReveal();
     var el = $('drawCd'); if (!el) return;
-    var at = new Date(dayKey() + 'T20:30:00+05:30'), polled = 0;   /* results are published at 8:30 PM IST */
+    var polled = Date.now();   /* results are published at 8:30 PM IST, or right after an early (Skip) draw */
     function tick() {
-      var ms = at - new Date();
+      var ms = publishAt(dayKey()) - new Date();
+      if (ms > 0 && Date.now() - polled > 60000) { polled = Date.now(); refreshResults(true); }   /* notices an early close */
       if (ms <= 0) {
         el.textContent = 'Waiting for the draw to run'; el.classList.add('sm');
         var k = $('drawCdK'); if (k) k.textContent = 'Today’s draw';
@@ -1542,7 +1549,7 @@
       : days.map(function (d) {
         var pub = d.status === 'published', on = focus && focus === d.label;
         return '<div class="surface mt12' + (on ? ' vd-on' : '') + '" style="padding:4px 16px" id="vd-' + esc(d.label) + '">' +
-          '<div class="kv"><span><b>' + esc(d.label) + '</b>' + (d.kind === 'test' ? ' <span class="badge warn">TEST</span>' : '') + '</span><span><span class="badge ' + (pub ? 'ok' : 'plain') + '">' + (pub ? 'Published' : 'Sealed · result at 8:30 PM') + '</span></span></div>' +
+          '<div class="kv"><span><b>' + esc(d.label) + '</b>' + (d.kind === 'test' ? ' <span class="badge warn">TEST</span>' : '') + '</span><span><span class="badge ' + (pub ? 'ok' : 'plain') + '">' + (pub ? 'Published' : 'Sealed · result at ' + resultsTimeLabel(d.label)) + '</span></span></div>' +
           '<div class="kv"><span>Tickets</span><span>' + num(d.ticketCount || 0) + '</span></div>' +
           '<div class="kv"><span>Fingerprint</span><span class="adm-fp">' + esc(d.fingerprint || '') + '</span></div>' +
           '<div class="kv"><span>Seal</span><span>' + (d.sealUrl ? dl(d.sealUrl, 'On GitHub') : 'Publishing…') + ' · ' + file(api + d.label + '/seal.json', 'seal.json') + '</span></div>' +
@@ -1834,7 +1841,12 @@
     if (d.status === 'open' && d.kind === 'test') body = '<div class="btn-row mt16"><button class="btn btn-line" data-act="admSeed"' + (seeding ? ' disabled' : '') + '>' + (seeding ? 'Adding… ' + num(seeding.done) + ' / ' + num(seeding.target) : 'Add 5,000 tickets') + '</button>' +
       '<button class="btn btn-gold" data-act="admClose"' + (seeding || !d.ticketCount ? ' disabled' : '') + '>Close entries now</button></div>' +
       '<p class="fine center">Tickets are bought by 20 test customers through the real paid-order path. Closing seals the list and picks a drand round about 30 s ahead.</p>';
-    else if (d.status === 'open') body = '<div class="rule-note mt16">' + ic('clock', 16) + '<span>Entries close at ' + istTime(d.closesAt) + '. The ticket list is then sealed automatically.</span></div>';
+    else if (d.status === 'open') body = '<div class="rule-note mt16">' + ic('clock', 16) + '<span>Entries close at ' + istTime(d.closesAt) + '. The ticket list is then sealed automatically.</span></div>' +
+      (!d.canSkip ? (d.kind === 'real' && d.label === dayKey() && (d.ticketCount || 0) < 10 ? '<p class="fine center mt12">Skip the wait appears once today has at least 10 tickets (one per winner).</p>' : '') : A.skipArm === d.label
+        ? '<div class="rule-note mt16">' + ic('shield', 16) + '<span>Close today’s entries now? The ' + num(d.ticketCount || 0) + ' tickets entered so far are sealed and drawn; cards entered after this go into tomorrow’s draw. This cannot be undone.</span></div>' +
+          '<div class="btn-row mt12"><button class="btn btn-line" data-act="admSkipCancel">Cancel</button><button class="btn btn-gold" data-act="admSkip">Yes, close and draw now</button></div>'
+        : '<button class="btn btn-gold mt16" data-act="admSkipArm">' + ic('sparkle', 16) + 'Skip the wait · draw now</button>' +
+          '<p class="fine center">Seals today’s list now instead of at 8:00 PM. The founder’s OTP can be sent about 30 s later, and results go public as soon as the draw runs.</p>');
     else if (d.status === 'sealed' && !d.canRequestOtp) body = '<div class="rule-note mt16">' + ic('clock', 16) + '<span>Waiting for drand round ' + d.drandRound + ', released at ' + istTime(d.roundReleasedAt, true) + '. The founder’s OTP can be sent after that.</span></div>';
     else if (d.status === 'sealed' && !d.otpExpiresAt) body = '<button class="btn btn-gold mt16" data-act="admSendOtp">' + ic('phone', 18) + 'Send OTP to founder</button>' +
       '<p class="fine center">The founder gets a 4-digit code by SMS. It runs this draw only, on the sealed list and the drand round above.</p>';
@@ -1976,7 +1988,18 @@
     },
     staffOutlet: function (el) { SES.outlet = el.dataset.id; saveSes(); rerender(); },
     staffLogout: function () { SES.staffId = null; saveSes(); ui.staffMobile = ''; go('welcome'); },
-    admPick: function (el) { ui.adm.sel = el.dataset.id; rerender(); },
+    admPick: function (el) { ui.adm.sel = el.dataset.id; ui.adm.skipArm = null; rerender(); },
+    /* Skip: a real day is sealed now (drand round ~30 s ahead), then the usual OTP → draw; first tap only asks */
+    admSkipArm: function () { var d = admDay(); if (d && d.canSkip) { ui.adm.skipArm = d.label; rerender(); } },
+    admSkipCancel: function () { ui.adm.skipArm = null; rerender(); },
+    admSkip: function () {
+      var d = admDay(); if (!d || ui.adm.busy || ui.adm.skipArm !== d.label) return; ui.adm.busy = true;
+      BCAPI.post('/admin/draw-days/' + encodeURIComponent(d.label) + '/skip').then(function (day) {
+        ui.adm.busy = false; ui.adm.skipArm = null;
+        ui.adm.days = ui.adm.days.map(function (x) { return x.label === day.label ? day : x; });
+        rerender(); toast('Entries closed · list sealed · OTP in about 30 s');
+      }, function (e) { ui.adm.busy = false; ui.adm.skipArm = null; toast(e.message || 'Could not skip the wait'); admLoad().then(rerender); });
+    },
     admReveal: function () { var d = admDay(); if (d && d.winners) playReveal(d.label, d.winners, []); },
     admNewTest: function () {
       if (ui.adm.busy) return; ui.adm.busy = true;

@@ -56,7 +56,11 @@ A Draw day created on demand by an Admin to rehearse the full cycle; it never mi
 _Avoid_: Demo, sandbox
 
 **Entries close**:
-The moment (8:00 PM IST on a real Draw day) after which no Ticket can be added, removed or changed for that day.
+The moment (8:00 PM IST on a real Draw day, or earlier if an Admin uses **Skip**) after which no Ticket can be added, removed or changed for that day.
+
+**Skip**:
+An Admin closing today's Entries early so its draw runs without waiting for 8:15 PM (ADR-0008). The Seal then names a Randomness round about 30 seconds ahead, and the result is published straight after the Draw run.
+_Avoid_: Fast-forward, instant draw
 _Avoid_: Cut-off, lock
 
 **Seal**:

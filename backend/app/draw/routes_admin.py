@@ -1,7 +1,9 @@
-"""Admin: see Draw days, send the Founder's OTP, and enter it to run the draw. Nothing else.
+"""Admin: see Draw days, close today's entries early (Skip), send the Founder's OTP, and enter it to run the
+draw. Nothing else.
 
 There is deliberately no endpoint that redraws, edits or rejects Winners."""
 
+import logging
 import threading
 from datetime import timedelta
 from typing import Annotated
@@ -14,11 +16,13 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_db, require_admin
 from app.db import models as m
 from app.draw.drand import round_released_at
+from app.draw.drawdays import SkipRefused, can_skip, skip_to_draw
 from app.draw.drawrun import DrawRefused, run_draw
 from app.draw.lifecycle import publish_results, publish_seals
 from app.draw.otp import OtpRefused, active_expiry, request_otp
 from app.draw.testmode import TestModeRefused, close_test_day, create_test_day, seed_tickets, test_day
 
+log = logging.getLogger("boche.admin")
 router = APIRouter(prefix="/api/admin")
 Db = Annotated[Session, Depends(get_db)]
 Label = Annotated[str, Path(pattern=r"^[A-Za-z0-9-]{1,40}$")]
@@ -82,6 +86,7 @@ def day_json(db: Session, day: m.DrawDay, now) -> dict:
         "sealUrl": day.seal_url,
         "sealPublished": bool(day.seal_commit_sha),
         "canRequestOtp": day.status == "sealed" and now >= day.draw_not_before,
+        "canSkip": can_skip(db, day, now),
         "otpExpiresAt": _iso(otp_until),
         "drawnAt": _iso(day.drawn_at),
         "randomness": day.result.randomness if day.result else None,
@@ -111,6 +116,21 @@ def list_days(request: Request, db: Db) -> list[dict]:
 def get_day(label: Label, request: Request, db: Db) -> dict:
     require_admin(request, db)
     return day_json(db, _day(db, label), request.app.state.clock.now())
+
+
+@router.post("/draw-days/{label}/skip")
+def skip_wait(label: Label, request: Request, db: Db) -> dict:
+    """Close today's real Draw day now, so the Founder's OTP and the draw don't wait for 8:00 / 8:15 PM."""
+    admin = require_admin(request, db)
+    state, now = request.app.state, request.app.state.clock.now()
+    try:
+        day = skip_to_draw(db, label, now)
+    except SkipRefused as e:
+        raise HTTPException(status_code=e.status, detail=e.detail) from e
+    log.warning("entries for %s closed early (Skip) by admin user %s", label, admin.id)
+    publish_seals(db, state.seal_publisher)
+    db.refresh(day)
+    return day_json(db, day, now)
 
 
 @router.post("/draw-days/{label}/otp")

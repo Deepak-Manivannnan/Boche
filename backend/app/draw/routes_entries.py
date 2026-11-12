@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import current_user, get_db, require_admin
 from app.db import models as m
-from app.draw.drawdays import accepts_entries, entry_day, real_day
+from app.draw.drawdays import accepts_entries, entry_draw_day
 from app.shop.catalog import prize
 
 router = APIRouter(prefix="/api")
@@ -43,7 +43,7 @@ def enter_draw(body: NewEntry, request: Request, db: Db) -> dict:
         raise HTTPException(status_code=409, detail=f"This order is {card.order.status}")
 
     # Locking the Draw day row means Entries close (ticket 08) can't freeze the list mid-entry.
-    day = real_day(db, entry_day(now), lock=True)
+    day = entry_draw_day(db, now)
     if not accepts_entries(day, now):
         raise HTTPException(status_code=409, detail="This draw is closed for entries")
     card.entered_at, card.draw_day_id = now, day.id

@@ -65,6 +65,7 @@ def test_the_admin_api_offers_no_way_to_redraw_edit_or_reject_winners(w):
     assert admin_routes == {
         ("/api/admin/draw-days", ("GET",)),
         ("/api/admin/draw-days/{label}", ("GET",)),
+        ("/api/admin/draw-days/{label}/skip", ("POST",)),  # closes today's entries early; draws nothing
         ("/api/admin/draw-days/{label}/otp", ("POST",)),
         ("/api/admin/draw-days/{label}/run", ("POST",)),
         ("/api/admin/orders/{order_id}/refund", ("POST",)),
