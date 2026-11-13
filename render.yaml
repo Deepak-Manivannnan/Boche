@@ -26,9 +26,10 @@ services:
       # Public by design: the Google client ID is sent to every browser.
       - key: GOOGLE_CLIENT_ID
         value: 225166969003-9q66a10mk0kip7p55ll5uu2sit6vfmqb.apps.googleusercontent.com
-      # Who may act as Admin (comma-separated). Re-read at every sign-in.
+      # Admin Gmail addresses (comma-separated). Set in the dashboard only: a value here would be written back
+      # over the dashboard's list at every Blueprint sync (each push), dropping admins added there.
       - key: ADMIN_EMAILS
-        value: deepakmanivannnan@gmail.com
+        sync: false
       # Admin mobile numbers (comma-separated) that may sign in to the admin page with an SMS code. Codes go
       # only to these numbers. Personal data and this repository is public: set it in the dashboard only.
       - key: ADMIN_MOBILES
